@@ -1,0 +1,90 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Advisor {
+  id              String    @id @default(uuid())
+  salutation      String
+  firstName       String
+  lastName        String
+  designation     String
+  yearsExperience Int       @default(0)
+  expertiseTags   String[]
+  role            String
+
+  // Relations
+  reviews         Review[]   // one advisor can have many reviews
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model User {
+  id         String   @id @default(uuid())
+  firstName  String
+  lastName   String
+  phoneNo    String   @unique
+  email      String   @unique
+  panCardNo  String   @unique
+  aadhaarNo  String   @unique
+  kycDone    Boolean  @default(false)
+
+  // Relations
+  reviews    Review[]   // one user can give many reviews
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Review {
+  id        String   @id @default(uuid())
+  rating    Float
+  comment   String?
+  
+  // Foreign keys
+  advisorId String
+  userId    String
+
+  // Relations
+  advisor   Advisor  @relation(fields: [advisorId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+
+model Quiz {
+  id        Int        @id @default(autoincrement())
+  title     String
+  questions Question[]
+  createdAt DateTime   @default(now())
+}
+
+model Question {
+  id        Int      @id @default(autoincrement())
+  quizId    Int
+  quiz      Quiz     @relation(fields: [quizId], references: [id])
+  
+  text      String
+  optionA   String
+  optionB   String
+  optionC   String
+  optionD   String
+  correct   String   // store the correct answer as string (e.g. "optionC")
+
+  createdAt DateTime @default(now())
+}
+
+
