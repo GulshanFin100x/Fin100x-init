@@ -62,6 +62,8 @@ model Review {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@unique([advisorId, userId])  // ✅ ensures 1 review per user per advisor
 }
 
 

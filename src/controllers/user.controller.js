@@ -59,3 +59,25 @@ export const chat = async (req, res) => {
     res.status(500).json({ error: "Something went wrong" });
   }
 };
+
+export const addUser = async (req, res) => {
+  try {
+    const { firstName, lastName, phoneNo, email, panCardNo, aadhaarNo } = req.body;
+
+    const user = await prisma.user.create({
+      data: {
+        firstName,
+        lastName,
+        phoneNo,
+        email,
+        panCardNo,
+        aadhaarNo,
+      },
+    });
+
+    res.status(201).json(user);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message });
+  }
+};
