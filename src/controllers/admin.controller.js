@@ -7,7 +7,7 @@ import prisma from "../lib/prisma.js";
  *   "title": "Finance Basics",
  *   "questions": [
  *      { "text": "2+2?", "optionA": "3", "optionB": "4", "optionC": "5", "optionD": "6", "correct": "optionB" },
- *      { "text": "Capital of India?", "optionA": "Mumbai", "optionB": "Delhi", "optionC": "Kolkata", "optionD": "Chennai", "correct": "optionB" }
+ *      { "text": "Capital of India?", "optionA": "Mumbai", "optionB": "Delhi", "optionC": "Kolkata", "optionD": "Chennai",           "correct": "optionB" }
  *   ]
  * }
  */

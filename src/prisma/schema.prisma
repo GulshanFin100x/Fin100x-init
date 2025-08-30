@@ -31,20 +31,39 @@ model Advisor {
 }
 
 model User {
-  id         String   @id @default(uuid())
-  firstName  String
-  lastName   String
-  phoneNo    String   @unique
-  email      String   @unique
-  panCardNo  String   @unique
-  aadhaarNo  String   @unique
-  kycDone    Boolean  @default(false)
+  uid           String   @id        // Use uid as the primary key
+  reviews       Review[]
+  conversations Conversation[]
+  messages      Message[]
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Conversation {
+  id        String   @id @default(uuid())
+  title     String
+  uid       String   // FK to User
+  messages  Message[]
+  createdAt DateTime @default(now())
 
   // Relations
-  reviews    Review[]   // one user can give many reviews
+  user User @relation(fields: [uid], references: [uid], onDelete: Cascade)
+}
 
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+model Message {
+  id               String   @id @default(uuid())
+  conversationId   String
+  uid              String   // FK to User
+  message_query    String
+  message_response String
+  is_bot           Boolean  @default(false)
+  is_encrypted     Boolean  @default(false)
+  createdAt        DateTime @default(now())
+
+  // Relations
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [uid], references: [uid], onDelete: Cascade)
 }
 
 model Review {
@@ -58,7 +77,7 @@ model Review {
 
   // Relations
   advisor   Advisor  @relation(fields: [advisorId], references: [id])
-  user      User     @relation(fields: [userId], references: [id])
+  user      User     @relation(fields: [userId], references: [uid])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

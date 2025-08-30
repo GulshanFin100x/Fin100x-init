@@ -44,7 +44,23 @@ export const protectRoute = async (req, res, next) => {
   const idToken = match[1];
   try {
     const decoded = await admin.auth().verifyIdToken(idToken);
+    const uid = decoded.uid; // ✅ Extract uid
     req.user = decoded; // contains uid and custom claims
+
+    // Check if user exists in DB
+    let user = await prisma.user.findUnique({
+      where: { firebaseID },
+    });
+
+    // If not found, create new user
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          uid, // Store uid as firebaseID
+        },
+      });
+    }
+
     next();
   } catch (err) {
     console.error("Token verification failed:", err.message || err);
