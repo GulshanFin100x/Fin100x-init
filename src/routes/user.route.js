@@ -9,11 +9,11 @@ import {
 
 const router = express.Router();
 
-// router.use(protectRoute);
+router.use(protectRoute);
 
 router.get("/conversations", conversations);
 router.get("/conversations/:id/messages", messages);
-router.get("/conversations/:conversationId?/chat", chatWithBot);
+router.post("/conversations/chat", chatWithBot);
 router.get("/quiz", getQuiz);
 // router.post("/KYC/aadhar", onboardUser);
 // router.post("/KYC/pan", onboardUser);

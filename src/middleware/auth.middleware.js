@@ -1,4 +1,5 @@
 import admin from "firebase-admin";
+import prisma from "../lib/prisma.js";
 
 const API_KEY = process.env.FIREBASE_API_KEY;
 if (!API_KEY) {
@@ -49,7 +50,7 @@ export const protectRoute = async (req, res, next) => {
 
     // Check if user exists in DB
     let user = await prisma.user.findUnique({
-      where: { firebaseID },
+      where: { uid },
     });
 
     // If not found, create new user

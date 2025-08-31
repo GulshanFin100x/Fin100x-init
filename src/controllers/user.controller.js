@@ -60,7 +60,7 @@ export const messages = async (req, res) => {
       where: { id },
     });
 
-    if (!conversation || conversation.firebaseID !== uid) {
+    if (!conversation || conversation.uid !== uid) {
       return res
         .status(403)
         .json({ error: "Forbidden: conversation not found or not yours" });
@@ -73,7 +73,6 @@ export const messages = async (req, res) => {
         id: true,
         message_query: true,
         message_response: true,
-        is_bot: true,
         is_encrypted: true,
         createdAt: true,
       },
@@ -109,7 +108,6 @@ export const messages = async (req, res) => {
         conversationId: id,
         query,
         response,
-        is_bot: msg.is_bot,
         createdAt: msg.createdAt,
       };
     });
@@ -123,7 +121,7 @@ export const messages = async (req, res) => {
 
 export const chatWithBot = async (req, res) => {
   try {
-    const { conversationId } = req.params;
+    const { conversationId } = req.body;
     const { query } = req.body;
     const uid = req.user.uid;
 
@@ -132,6 +130,7 @@ export const chatWithBot = async (req, res) => {
     }
 
     let convId = conversationId;
+    let convTitle = null;
 
     // 1. Create conversation if null
     if (!convId || convId === "null") {
@@ -139,10 +138,11 @@ export const chatWithBot = async (req, res) => {
       const newConversation = await prisma.conversation.create({
         data: {
           title,
-          firebaseID: uid,
+          uid: uid,
         },
       });
       convId = newConversation.id;
+      convTitle = newConversation.title;
     }
 
     // 2. Fetch last 5 messages
@@ -153,8 +153,6 @@ export const chatWithBot = async (req, res) => {
       select: {
         message_query: true,
         message_response: true,
-        is_bot: true,
-        is_encrypted: true,
       },
     });
 
@@ -167,30 +165,37 @@ export const chatWithBot = async (req, res) => {
         const botMsg = msg.message_response
           ? decrypt(JSON.parse(msg.message_response))
           : null;
-        return msg.is_bot
-          ? { role: "assistant", content: botMsg }
-          : { role: "user", content: userMsg };
+        return { query: userMsg, reponse: botMsg };
       })
       .reverse();
 
+    // console.log("Decrypted context:", context); 
     // 4. Prepare payload for API
     const apiPayload = {
+      uid : req.user.uid,
+      conversationId: convId,
       messages: [...context, { role: "user", content: query }],
     };
 
-    // 5. Call external API
-    const apiResponse = await axios.post(
-      "https://your-external-api.com/chat",
-      apiPayload,
-      {
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.EXTERNAL_API_KEY}`,
-        },
-      }
-    );
 
-    const responseText = apiResponse.data.reply || "No response from API";
+    console.log("payload", apiPayload); 
+
+    // 5. Call external API
+    // const apiResponse = await axios.post(
+    //   "https://your-external-api.com/chat",
+    //   apiPayload,
+    //   {
+    //     headers: {
+    //       "Content-Type": "application/json",
+    //       Authorization: `Bearer ${process.env.EXTERNAL_API_KEY}`,
+    //     },
+    //   }
+    // );
+
+    // const responseText = apiResponse.data.reply || "No response from API";
+
+    const responseText =
+      "This is a demo response since AI API is not yet integrated";
 
     // 6. Encrypt and save
     const encQuery = encrypt(query);
@@ -198,18 +203,23 @@ export const chatWithBot = async (req, res) => {
 
     const message = await prisma.message.create({
       data: {
-        conversationId: convId,
-        firebaseID: uid,
         message_query: JSON.stringify(encQuery),
         message_response: JSON.stringify(encResponse),
         is_bot: true,
         is_encrypted: true,
+        conversation: {
+          connect: { id: convId }, // link to existing Conversation
+        },
+        user: {
+          connect: { uid: uid }, // link to existing User
+        },
       },
     });
 
     // 7. Send response
     res.json({
       conversationId: convId,
+      conversationTitle: convTitle,
       messageId: message.id,
       botResponse: responseText,
     });

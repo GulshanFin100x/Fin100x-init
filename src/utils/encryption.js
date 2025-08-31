@@ -1,7 +1,7 @@
 import crypto from "crypto";
 
 const ALGO = "aes-256-gcm";
-const SECRET = process.env.ENCRYPTION_KEY || "super-secret-32bytes-key!!!!";
+const SECRET = Buffer.from(process.env.ENCRYPTION_KEY, "hex");
 // Must be exactly 32 characters (32 bytes)
 
 export function encrypt(text) {
