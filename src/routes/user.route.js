@@ -5,6 +5,8 @@ import {
   conversations,
   messages,
   chatWithBot,
+  media,
+  uploadMedia,
 } from "../controllers/user.controller.js";
 
 const router = express.Router();
@@ -15,6 +17,12 @@ router.get("/conversations", conversations);
 router.get("/conversations/:id/messages", messages);
 router.post("/conversations/chat", chatWithBot);
 router.get("/quiz", getQuiz);
+
+// router.post("/media/upload-url", getUploadUrl);
+// router.post("/media/confirm", confirmUpload);
+// router.get("/media/:userId", getUserMedia);
+router.get("/media", media);
+router.post("/media/upload", uploadMedia);
 // router.post("/KYC/aadhar", onboardUser);
 // router.post("/KYC/pan", onboardUser);
 // router.post("/KYC/bankDetails", onboardUser);

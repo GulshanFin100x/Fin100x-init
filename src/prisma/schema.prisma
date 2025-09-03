@@ -1,9 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -30,31 +27,95 @@ model Advisor {
   updatedAt       DateTime @updatedAt
 }
 
+enum KycStatus {
+  none
+  pending
+  verified
+}
+
 model User {
-  uid           String   @id        // Use uid as the primary key
-  reviews       Review[]
+  id           String    @id @default(uuid())
+  phone        String    @unique
+  phoneMasked  String
+  name         String?
+  language     String    @default("en-IN")
+  referralCode String?
+  isNew        Boolean   @default(true)
+  kycStatus    KycStatus @default(none)
+
+  session      Session?
   conversations Conversation[]
   messages      Message[]
+  reviews       Review[]
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model OTPRequest {
+  id        String   @id                  // requestId, e.g., "req_xxx"
+  phone     String
+  otpHash   String                         // bcrypt hash of OTP
+  deviceId  String?
+  channel   String   @default("sms")
+  locale    String   @default("en-IN")
+  expiresAt DateTime
+  verified  Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model Session {
+  id               String   @id @default(cuid())
+  userId           String   @unique           // single active session per user
+  refreshTokenHash String
+  deviceId         String?
+  revoked          Boolean  @default(false)
+  expiresAt        DateTime
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Video {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  fileName    String    // e.g. "videos/abc123.mp4" OR "shorts/xyz456.mp4"
+  type        VideoType @default(VIDEO)   // ✅ distinguishes between long videos & shorts
+  likes       Int       @default(0)
+  comments    Comment[]
+  createdAt   DateTime  @default(now())
+}
+
+enum VideoType {
+  VIDEO
+  SHORT
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  content   String
+  videoId   String
+  video     Video    @relation(fields: [videoId], references: [id])
+  createdAt DateTime @default(now())
 }
 
 model Conversation {
   id        String   @id @default(uuid())
   title     String
-  uid       String   // FK to User
+  userId    String   // ✅ FK to User
   messages  Message[]
   createdAt DateTime @default(now())
 
   // Relations
-  user User @relation(fields: [uid], references: [uid], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Message {
   id               String   @id @default(uuid())
   conversationId   String
-  uid              String   // FK to User
+  userId           String   // ✅ FK to User
   message_query    String
   message_response String
   is_bot           Boolean  @default(false)
@@ -63,28 +124,27 @@ model Message {
 
   // Relations
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  user         User         @relation(fields: [uid], references: [uid], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Review {
   id        String   @id @default(uuid())
   rating    Float
   comment   String?
-  
+
   // Foreign keys
   advisorId String
   userId    String
 
   // Relations
   advisor   Advisor  @relation(fields: [advisorId], references: [id])
-  user      User     @relation(fields: [userId], references: [uid])
+  user      User     @relation(fields: [userId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([advisorId, userId])  // ✅ ensures 1 review per user per advisor
 }
-
 
 model Quiz {
   id        Int        @id @default(autoincrement())
@@ -97,7 +157,7 @@ model Question {
   id        Int      @id @default(autoincrement())
   quizId    Int
   quiz      Quiz     @relation(fields: [quizId], references: [id])
-  
+
   text      String
   optionA   String
   optionB   String
@@ -107,5 +167,3 @@ model Question {
 
   createdAt DateTime @default(now())
 }
-
-

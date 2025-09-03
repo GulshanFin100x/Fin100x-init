@@ -1,16 +1,16 @@
 import prisma from "../lib/prisma.js";
 import { encrypt, decrypt } from "../utils/encryption.js";
 import axios from "axios";
+import { Storage } from "@google-cloud/storage";
 
+// --------------------
+// Quiz Controller
+// --------------------
 export const getQuiz = async (req, res) => {
   try {
     const latestQuiz = await prisma.quiz.findFirst({
-      orderBy: {
-        createdAt: "desc", // latest first
-      },
-      include: {
-        questions: true, // also fetch related questions
-      },
+      orderBy: { createdAt: "desc" },
+      include: { questions: true },
     });
 
     if (!latestQuiz) {
@@ -27,20 +27,17 @@ export const getQuiz = async (req, res) => {
   }
 };
 
+// --------------------
+// Conversation List
+// --------------------
 export const conversations = async (req, res) => {
   try {
-    const uid = req.user.uid;
+    const userId = req.user.id; // ✅ matches new schema
 
     const conversations = await prisma.conversation.findMany({
-      where: { uid },
-      select: {
-        id: true,
-        title: true,
-        createdAt: true,
-      },
-      orderBy: {
-        createdAt: "desc", // ✅ most recent first
-      },
+      where: { userId },
+      select: { id: true, title: true, createdAt: true },
+      orderBy: { createdAt: "desc" },
     });
 
     return res.json({ conversations });
@@ -50,23 +47,24 @@ export const conversations = async (req, res) => {
   }
 };
 
+// --------------------
+// Messages in a Conversation
+// --------------------
 export const messages = async (req, res) => {
   try {
-    const uid = req.user.uid;
+    const userId = req.user.id;
     const { id } = req.params; // conversationId
 
-    // ✅ Check if conversation belongs to user
     const conversation = await prisma.conversation.findUnique({
       where: { id },
     });
 
-    if (!conversation || conversation.uid !== uid) {
+    if (!conversation || conversation.userId !== userId) {
       return res
         .status(403)
         .json({ error: "Forbidden: conversation not found or not yours" });
     }
 
-    // ✅ Fetch messages ordered by createdAt (oldest → newest)
     const rawMessages = await prisma.message.findMany({
       where: { conversationId: id },
       select: {
@@ -76,12 +74,9 @@ export const messages = async (req, res) => {
         is_encrypted: true,
         createdAt: true,
       },
-      orderBy: {
-        createdAt: "asc",
-      },
+      orderBy: { createdAt: "asc" },
     });
 
-    // ✅ Decrypt messages before sending
     const messages = rawMessages.map((msg) => {
       let query = msg.message_query;
       let response = msg.message_response;
@@ -119,11 +114,13 @@ export const messages = async (req, res) => {
   }
 };
 
+// --------------------
+// Chat with Bot
+// --------------------
 export const chatWithBot = async (req, res) => {
   try {
-    const { conversationId } = req.body;
-    const { query } = req.body;
-    const uid = req.user.uid;
+    const { conversationId, query } = req.body;
+    const userId = req.user.id;
 
     if (!query) {
       return res.status(400).json({ error: "Query is required" });
@@ -132,31 +129,25 @@ export const chatWithBot = async (req, res) => {
     let convId = conversationId;
     let convTitle = null;
 
-    // 1. Create conversation if null
+    // Create conversation if new
     if (!convId || convId === "null") {
       const title = query.split(" ").slice(0, 5).join(" ");
       const newConversation = await prisma.conversation.create({
-        data: {
-          title,
-          uid: uid,
-        },
+        data: { title, userId },
       });
       convId = newConversation.id;
       convTitle = newConversation.title;
     }
 
-    // 2. Fetch last 5 messages
+    // Fetch last 5 messages
     const lastMessages = await prisma.message.findMany({
       where: { conversationId: convId },
       orderBy: { createdAt: "desc" },
       take: 5,
-      select: {
-        message_query: true,
-        message_response: true,
-      },
+      select: { message_query: true, message_response: true },
     });
 
-    // 3. Decrypt context
+    // Decrypt context
     const context = lastMessages
       .map((msg) => {
         const userMsg = msg.message_query
@@ -165,39 +156,30 @@ export const chatWithBot = async (req, res) => {
         const botMsg = msg.message_response
           ? decrypt(JSON.parse(msg.message_response))
           : null;
-        return { query: userMsg, reponse: botMsg };
+        return { query: userMsg, response: botMsg };
       })
       .reverse();
 
-    // console.log("Decrypted context:", context); 
-    // 4. Prepare payload for API
+    // Payload for external API
     const apiPayload = {
-      uid : req.user.uid,
+      userId,
       conversationId: convId,
       messages: [...context, { role: "user", content: query }],
     };
 
+    console.log("payload", apiPayload);
 
-    console.log("payload", apiPayload); 
-
-    // 5. Call external API
     // const apiResponse = await axios.post(
     //   "https://your-external-api.com/chat",
     //   apiPayload,
-    //   {
-    //     headers: {
-    //       "Content-Type": "application/json",
-    //       Authorization: `Bearer ${process.env.EXTERNAL_API_KEY}`,
-    //     },
-    //   }
+    //   { headers: { Authorization: `Bearer ${process.env.EXTERNAL_API_KEY}` } }
     // );
-
     // const responseText = apiResponse.data.reply || "No response from API";
 
     const responseText =
       "This is a demo response since AI API is not yet integrated";
 
-    // 6. Encrypt and save
+    // Encrypt and save
     const encQuery = encrypt(query);
     const encResponse = encrypt(responseText);
 
@@ -207,16 +189,11 @@ export const chatWithBot = async (req, res) => {
         message_response: JSON.stringify(encResponse),
         is_bot: true,
         is_encrypted: true,
-        conversation: {
-          connect: { id: convId }, // link to existing Conversation
-        },
-        user: {
-          connect: { uid: uid }, // link to existing User
-        },
+        conversation: { connect: { id: convId } },
+        user: { connect: { id: userId } },
       },
     });
 
-    // 7. Send response
     res.json({
       conversationId: convId,
       conversationTitle: convTitle,
@@ -226,5 +203,104 @@ export const chatWithBot = async (req, res) => {
   } catch (err) {
     console.error("Error in chatWithBot:", err.message || err);
     res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// --------------------
+// Google Cloud Storage Config
+// --------------------
+const storage = new Storage({
+  projectId: process.env.GCP_PROJECT_ID,
+  keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+});
+
+const bucketName = process.env.GCP_BUCKET_NAME;
+
+// --------------------
+// Helper: Get signed READ URL
+// --------------------
+async function getSignedUrl(fileName) {
+  const options = {
+    version: "v4",
+    action: "read",
+    expires: Date.now() + 15 * 60 * 1000, // 15 minutes
+  };
+
+  const [url] = await storage.bucket(bucketName).file(fileName).getSignedUrl(options);
+  return url;
+}
+
+// --------------------
+// GET /media?page=1&limit=10&type=VIDEO
+// --------------------
+export const media = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+    const type = req.query.type || "VIDEO"; // default
+
+    const videos = await prisma.video.findMany({
+      skip,
+      take: limit,
+      where: { type },
+      include: { comments: true },
+      orderBy: { createdAt: "desc" },
+    });
+
+    // attach signed GCS URL
+    const videosWithUrl = await Promise.all(
+      videos.map(async (video) => ({
+        ...video,
+        url: await getSignedUrl(video.fileName),
+      }))
+    );
+
+    const totalCount = await prisma.video.count({ where: { type } });
+
+    res.json({
+      page,
+      limit,
+      type,
+      totalPages: Math.ceil(totalCount / limit),
+      totalCount,
+      videos: videosWithUrl,
+    });
+  } catch (error) {
+    console.error("Error fetching media:", error);
+    res.status(500).json({ error: "Failed to fetch videos" });
+  }
+};
+
+// --------------------
+// POST /media (upload metadata after file upload)
+// --------------------
+export const uploadMedia = async (req, res) => {
+  try {
+    const { title, description, fileName } = req.body;
+
+    if (!title || !fileName) {
+      return res.status(400).json({ error: "title and fileName are required" });
+    }
+
+    // detect type from file path
+    let type = "VIDEO";
+    if (fileName.startsWith("shorts/")) {
+      type = "SHORT";
+    }
+
+    const newVideo = await prisma.video.create({
+      data: {
+        title,
+        description,
+        fileName,
+        type,
+      },
+    });
+
+    res.status(201).json(newVideo);
+  } catch (error) {
+    console.error("Error saving video:", error);
+    res.status(500).json({ error: "Failed to save video data" });
   }
 };
