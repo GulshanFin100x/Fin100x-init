@@ -66,7 +66,6 @@ export async function requestOtp(req, res) {
       resendAfter: 30,
       maskedPhone: maskPhone(phone),
       deliveryChannel: channel || "sms",
-      ...(SANDBOX ? { debugHint: "OTP is 123456 in sandbox" } : {}),
     });
   } catch (e) {
     console.error("requestOtp:", e);
