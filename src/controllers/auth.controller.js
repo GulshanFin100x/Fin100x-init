@@ -232,7 +232,7 @@ export async function refreshAccessToken(req, res) {
     });
 
     const accessToken = signAccessToken({
-      userId: user.id,
+      userId: decoded.userId,
       sessionId: session.id,
     });
 
