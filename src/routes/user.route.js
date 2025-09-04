@@ -7,6 +7,7 @@ import {
   chatWithBot,
   media,
   uploadMedia,
+  updateUserProfile,
 } from "../controllers/user.controller.js";
 
 const router = express.Router();
@@ -16,6 +17,7 @@ router.use(protectRoute);
 router.get("/conversations", conversations);
 router.get("/conversations/:id/messages", messages);
 router.post("/conversations/chat", chatWithBot);
+router.patch("/profile", updateUserProfile);
 router.get("/quiz", getQuiz);
 
 // router.post("/media/upload-url", getUploadUrl);

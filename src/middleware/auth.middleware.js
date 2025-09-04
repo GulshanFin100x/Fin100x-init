@@ -1,5 +1,5 @@
-// src/middleware/auth.middleware.js
 import { verifyAccessToken } from "../utils/crypto.js";
+import prisma from "../lib/prisma.js";
 
 export async function protectRoute(req, res, next) {
   const authHeader = req.headers["authorization"] || "";
@@ -8,6 +8,8 @@ export async function protectRoute(req, res, next) {
     return res.status(401).json({ code: "NO_AUTH", message: "Missing token" });
   }
 
+  // Extra check in DB for revoked session
+
   const decoded = verifyAccessToken(token);
   if (!decoded) {
     return res
@@ -15,6 +17,15 @@ export async function protectRoute(req, res, next) {
       .json({ code: "INVALID_TOKEN", message: "Invalid or expired token" });
   }
 
-  req.user = decoded; // { userId, ... }
+  const session = await prisma.session.findUnique({
+    where: { id: decoded.sessionId },
+  });
+  if (!session || session.revoked || session.expiresAt < new Date()) {
+    return res.status(401).json({ code: "SESSION_REVOKED" });
+  }
+
+  // console.log("protectRoute:", decoded);
+
+  req.user = { userId: decoded.userId };
   next();
 }

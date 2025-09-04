@@ -40,7 +40,7 @@ export async function requestOtp(req, res) {
     const otp = SANDBOX ? "123456" : generateNumericOTP(6);
     const otpHash = await hashOtp(otp);
 
-    await prisma.oTPRequest.create({
+    await prisma.OTPRequest.create({
       data: {
         id: requestId,
         phone,
@@ -81,7 +81,7 @@ export async function verifyOtp(req, res) {
         });
     }
 
-    const record = await prisma.oTPRequest.findUnique({
+    const record = await prisma.OTPRequest.findUnique({
       where: { id: requestId },
     });
     if (
@@ -103,7 +103,7 @@ export async function verifyOtp(req, res) {
     }
 
     // Mark OTP request verified (idempotency)
-    await prisma.oTPRequest.update({
+    await prisma.OTPRequest.update({
       where: { id: requestId },
       data: { verified: true },
     });
@@ -131,7 +131,7 @@ export async function verifyOtp(req, res) {
     await revokeExistingSession(user.id);
 
     // Issue tokens
-    const accessToken = signAccessToken({ userId: user.id, phone });
+    
     const refreshToken = signRefreshToken({ userId: user.id });
 
     // Store only hash of refresh token
@@ -139,21 +139,23 @@ export async function verifyOtp(req, res) {
     const sessionExpiry = addDaysFromNow(REFRESH_TTL_DAYS);
 
     // Upsert session (unique userId ensures single active session)
-    await prisma.session.upsert({
-      where: { userId: user.id },
-      create: {
+    await prisma.session.deleteMany({ where: { userId: user.id } });
+
+    const session = await prisma.session.create({
+      data: {
         userId: user.id,
         refreshTokenHash: refreshHash,
         deviceId: deviceId || null,
         revoked: false,
         expiresAt: sessionExpiry,
       },
-      update: {
-        refreshTokenHash: refreshHash,
-        deviceId: deviceId || null,
-        revoked: false,
-        expiresAt: sessionExpiry,
-      },
+    });
+
+    // console.log("Session upserted:", session.id, user.id);
+
+    const accessToken = signAccessToken({
+      userId: user.id,
+      sessionId: session.id,
     });
 
     return res.json({
@@ -229,7 +231,10 @@ export async function refreshAccessToken(req, res) {
       data: { refreshTokenHash: newHash, expiresAt: newExpiry, revoked: false },
     });
 
-    const accessToken = signAccessToken({ userId: decoded.userId });
+    const accessToken = signAccessToken({
+      userId: user.id,
+      sessionId: session.id,
+    });
 
     return res.json({
       accessToken,

@@ -32,7 +32,7 @@ export const getQuiz = async (req, res) => {
 // --------------------
 export const conversations = async (req, res) => {
   try {
-    const userId = req.user.id; // ✅ matches new schema
+    const userId = req.user.userId; 
 
     const conversations = await prisma.conversation.findMany({
       where: { userId },
@@ -52,7 +52,7 @@ export const conversations = async (req, res) => {
 // --------------------
 export const messages = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.userId;
     const { id } = req.params; // conversationId
 
     const conversation = await prisma.conversation.findUnique({
@@ -120,7 +120,7 @@ export const messages = async (req, res) => {
 export const chatWithBot = async (req, res) => {
   try {
     const { conversationId, query } = req.body;
-    const userId = req.user.id;
+    const userId = req.user.userId;
 
     if (!query) {
       return res.status(400).json({ error: "Query is required" });
@@ -304,3 +304,39 @@ export const uploadMedia = async (req, res) => {
     res.status(500).json({ error: "Failed to save video data" });
   }
 };
+
+
+// --------------------
+// PATCH /user/profile (update name + mark isNew = false if true)
+// --------------------
+export async function updateUserProfile(req, res) {
+  try {
+    const userId = req.user?.userId; // comes from middleware
+    const { name } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({ code: "NO_AUTH", message: "Unauthorized" });
+    }
+
+    if (!name || name.trim() === "") {
+      return res
+        .status(400)
+        .json({ code: "BAD_REQUEST", message: "Name is required" });
+    }
+
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        name,
+        isNew: false, // always set false when updating name
+      },
+    });
+
+    return res.json({ user });
+  } catch (e) {
+    console.error("updateUserProfile:", e);
+    return res
+      .status(500)
+      .json({ code: "SERVER_ERROR", message: "Unable to update profile" });
+  }
+}
