@@ -30,10 +30,18 @@ async function revokeExistingSession(userId) {
 export async function requestOtp(req, res) {
   try {
     const { phone, channel, locale, consent, deviceId } = req.body || {};
-    if (!phone || !consent?.acceptedTnC || !consent?.acceptedPrivacy) {
+    // Validate phone number
+    const phoneRegex = /^\+91[6-9]\d{9}$/;
+    if (!phone || !phoneRegex.test(phone)) {
       return res
         .status(400)
-        .json({ code: "CONSENT_MISSING", message: "Consent or phone missing" });
+        .json({ code: "INVALID_PHONE", message: "Phone number is invalid" });
+    }
+
+    if (!consent?.acceptedTnC || !consent?.acceptedPrivacy) {
+      return res
+        .status(400)
+        .json({ code: "CONSENT_MISSING", message: "Consent missing" });
     }
 
     const requestId = "req_" + Math.random().toString(36).slice(2, 12);
