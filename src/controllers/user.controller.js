@@ -340,3 +340,55 @@ export async function updateUserProfile(req, res) {
       .json({ code: "SERVER_ERROR", message: "Unable to update profile" });
   }
 }
+
+
+// --------------------
+// GET /user/profile
+// Fetches all user details by userId from req.user (set by protectRoute middleware).
+// Returns user info including phone, name, language, referralCode, isNew, kycStatus, and timestamps.
+// Requires authentication via protectRoute middleware.
+// --------------------
+export async function getUserProfile(req, res) {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res
+        .status(401)
+        .json({ code: "UNAUTHORIZED", message: "Missing user" });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        phone: true,
+        phoneMasked: true,
+        name: true,
+        language: true,
+        referralCode: true,
+        isNew: true,
+        kycStatus: true,
+        createdAt: true,
+        updatedAt: true,
+        // You can include related data if needed:
+        // session: true,
+        // conversations: true,
+        // messages: true,
+        // reviews: true,
+      },
+    });
+
+    if (!user) {
+      return res
+        .status(404)
+        .json({ code: "NOT_FOUND", message: "User not found" });
+    }
+
+    return res.json({ user });
+  } catch (error) {
+    console.error("getUserProfile:", error);
+    return res
+      .status(500)
+      .json({ code: "SERVER_ERROR", message: "Unable to fetch user" });
+  }
+}

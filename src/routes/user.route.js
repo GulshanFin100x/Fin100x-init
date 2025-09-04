@@ -8,6 +8,7 @@ import {
   media,
   uploadMedia,
   updateUserProfile,
+  getUserProfile,
 } from "../controllers/user.controller.js";
 
 const router = express.Router();
@@ -19,6 +20,7 @@ router.get("/conversations/:id/messages", messages);
 router.post("/conversations/chat", chatWithBot);
 router.patch("/profile", updateUserProfile);
 router.get("/quiz", getQuiz);
+router.get("/profile", getUserProfile);
 
 // router.post("/media/upload-url", getUploadUrl);
 // router.post("/media/confirm", confirmUpload);
