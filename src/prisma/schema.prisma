@@ -12,14 +12,15 @@ datasource db {
 
 model Advisor {
   id              String    @id @default(uuid())
+  imageUrl        String
   salutation      String
   firstName       String
   lastName        String
   designation     String
   yearsExperience Int       @default(0)
   expertiseTags   String[]
-  role            String
-
+  certificate     String
+  fees            Float    @default(0)   // in INR
   // Relations
   reviews         Review[]   // one advisor can have many reviews
 
@@ -166,4 +167,19 @@ model Question {
   correct   String   // store the correct answer as string (e.g. "optionC")
 
   createdAt DateTime @default(now())
+}
+
+
+model Banner {
+  id          String   @id @default(uuid())
+  title       String
+  imageUrl    String   // store fileName like "banner1.png"
+  redirectUrl String   // e.g. "https://paytm.com/upi-offer"
+  screen      String   // e.g. "home", "quiz", "advisor"
+  validFrom   DateTime @default(now())
+  validTill   DateTime
+  isActive    Boolean  @default(true)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
