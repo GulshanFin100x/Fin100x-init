@@ -4,7 +4,7 @@ import { generateSignedUrl } from "../utils/gcp.js";
 
 export const getAdvisors = async (req, res) => {
   try {
-    const { page = 1, limit = 10, expertise } = req.query;
+    const { page = 1, limit = 10, expertise, search } = req.query;
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const take = parseInt(limit);
@@ -13,6 +13,13 @@ export const getAdvisors = async (req, res) => {
     let where = {};
     if (expertise) {
       where.expertiseTags = { has: expertise };
+    }
+
+    if (search) {
+      where.OR = [
+        { firstName: { contains: search, mode: "insensitive" } },
+        { lastName: { contains: search, mode: "insensitive" } },
+      ];
     }
 
     // Fetch advisors
