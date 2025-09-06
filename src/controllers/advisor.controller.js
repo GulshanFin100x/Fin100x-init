@@ -1,5 +1,109 @@
 import prisma from "../lib/prisma.js";
+import { generateSignedUrl } from "../utils/gcp.js";
 
+
+export const getAdvisors = async (req, res) => {
+  try {
+    const { page = 1, limit = 10, expertise } = req.query;
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const take = parseInt(limit);
+
+    // Build filter
+    let where = {};
+    if (expertise) {
+      where.expertiseTags = { has: expertise };
+    }
+
+    // Fetch advisors
+    const advisors = await prisma.advisor.findMany({
+      where,
+      skip,
+      take,
+      include: {
+        reviews: {
+          select: { rating: true },
+        },
+      },
+    });
+
+    // Map results (exclude raw reviews, add avg + count + signed image URL)
+    const data = await Promise.all(
+      advisors.map(async (advisor) => {
+        const ratings = advisor.reviews.map((r) => r.rating);
+        const avgRating =
+          ratings.length > 0
+            ? ratings.reduce((a, b) => a + b, 0) / ratings.length
+            : null;
+
+        return {
+          id: advisor.id,
+          salutation: advisor.salutation,
+          firstName: advisor.firstName,
+          lastName: advisor.lastName,
+          designation: advisor.designation,
+          yearsExperience: advisor.yearsExperience,
+          expertiseTags: advisor.expertiseTags,
+          certificate: advisor.certificate,
+          imageUrl: advisor.imageUrl
+            ? await generateSignedUrl(advisor.imageUrl)
+            : null,
+          rating: avgRating,
+          reviewCount: advisor.reviews.length,
+          createdAt: advisor.createdAt,
+          updatedAt: advisor.updatedAt,
+        };
+      })
+    );
+
+    // Total count for pagination
+    const total = await prisma.advisor.count({ where });
+
+    res.json({
+      page: parseInt(page),
+      limit: parseInt(limit),
+      total,
+      advisors: data,
+    });
+  } catch (error) {
+    console.error("Error fetching advisors:", error);
+    res.status(500).json({ error: "Failed to fetch advisors" });
+  }
+};
+
+export const createAdvisor = async (req, res) => {
+  try {
+    const {
+      salutation,
+      firstName,
+      lastName,
+      designation,
+      yearsExperience,
+      expertiseTags,
+      certificate,
+      imageUrl,
+    } = req.body;
+
+    const advisor = await prisma.advisor.create({
+      data: {
+        salutation,
+        firstName,
+        lastName,
+        designation,
+        yearsExperience: yearsExperience || 0,
+        expertiseTags,
+        certificate,
+        imageUrl,
+        kycStatus: kycStatus || "none",
+      },
+    });
+
+    res.status(201).json(advisor);
+  } catch (error) {
+    console.error("Error creating advisor:", error);
+    res.status(500).json({ error: "Failed to create advisor" });
+  }
+};
 
 export const reviews = async (req, res) => {
   try {
@@ -142,3 +246,6 @@ export const getAllAdvisorDetails = async (req, res) => {
     res.status(500).json({ message: "Server Error" });
   }
 };
+
+
+

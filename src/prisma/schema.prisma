@@ -28,10 +28,23 @@ model Advisor {
   updatedAt       DateTime @updatedAt
 }
 
-enum KycStatus {
-  none
-  pending
-  verified
+model Review {
+  id        String   @id @default(uuid())
+  rating    Float
+  comment   String?
+
+  // Foreign keys
+  advisorId String
+  userId    String
+
+  // Relations
+  advisor   Advisor  @relation(fields: [advisorId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([advisorId, userId])  // ✅ ensures 1 review per user per advisor
 }
 
 model User {
@@ -51,6 +64,12 @@ model User {
 
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+}
+
+enum KycStatus {
+  none
+  pending
+  verified
 }
 
 model OTPRequest {
@@ -126,25 +145,6 @@ model Message {
   // Relations
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model Review {
-  id        String   @id @default(uuid())
-  rating    Float
-  comment   String?
-
-  // Foreign keys
-  advisorId String
-  userId    String
-
-  // Relations
-  advisor   Advisor  @relation(fields: [advisorId], references: [id])
-  user      User     @relation(fields: [userId], references: [id])
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([advisorId, userId])  // ✅ ensures 1 review per user per advisor
 }
 
 model Quiz {

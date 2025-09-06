@@ -6,15 +6,16 @@ import {
   advisorRating,
   addAdvisor,
   getAllAdvisorDetails,
+  getAdvisors,
+  createAdvisor,
 } from "../controllers/advisor.controller.js";
 
 const router = express.Router();
 
 // router.use(protectRoute);
 
-router.get("/getAllAdvisorDetails", getAllAdvisorDetails);     //pagination should be implemented;
-// router.get("/profile", getUserDeatils);
-
+router.get("/", getAdvisors);                                   //pagination should be implemented;
+router.post("/", createAdvisor);                        
 router.post("/reviews", reviews);                              //User posts review
 router.get("/reviews/:advisorId", advisorReview);             //Get all reviews of an advisor with pagination
 router.get("/:advisorId/rating", advisorRating);              //Get average rating of an advisor
