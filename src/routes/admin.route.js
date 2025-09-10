@@ -8,7 +8,7 @@ const router = express.Router();
 
 // router.use(protectRoute);
 
-router.post("/createQuiz", createQuiz);
+router.post("/quiz", createQuiz);
 // router.post("/onboardAdvisor", onboardAdvisor);
 // router.post("/setBanner", setBanner);
 // router.post("/addShorts", addShorts);

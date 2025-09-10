@@ -8,6 +8,38 @@ import { Storage } from "@google-cloud/storage";
 // --------------------
 export const getQuiz = async (req, res) => {
   try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res
+        .status(401)
+        .json({ code: "UNAUTHORIZED", message: "Missing user" });
+    }
+
+    // 🔹 Get user and check quiz eligibility
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { lastQuizTakenAt: true },
+    });
+
+    let canTakeQuiz = true;
+    if (user?.lastQuizTakenAt) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const lastTaken = new Date(user.lastQuizTakenAt);
+      lastTaken.setHours(0, 0, 0, 0);
+
+      canTakeQuiz = lastTaken < today;
+    }
+
+    // ❌ If not eligible, block immediately
+    if (!canTakeQuiz) {
+      return res.status(403).json({
+        message: "You have already taken the quiz today. Come back tomorrow!",
+      });
+    }
+
+    // ✅ Get latest quiz only if eligible
     const latestQuiz = await prisma.quiz.findFirst({
       orderBy: { createdAt: "desc" },
       include: { questions: true },
@@ -24,6 +56,56 @@ export const getQuiz = async (req, res) => {
   } catch (err) {
     console.error("Error fetching latest quiz:", err);
     res.status(500).json({ error: "Failed to fetch latest quiz" });
+  }
+};
+
+
+// --------------------
+// Submit Quiz Controller
+// --------------------
+export const submitQuiz = async (req, res) => {
+  try {
+    const userId = req.user?.userId;
+    const { score } = req.body; // 👈 frontend sends score
+
+    if (!userId) {
+      return res
+        .status(401)
+        .json({ code: "UNAUTHORIZED", message: "Missing user" });
+    }
+
+    if (typeof score !== "number" || score < 0) {
+      return res
+        .status(400)
+        .json({
+          code: "INVALID_INPUT",
+          message: "Score must be a positive number",
+        });
+    }
+
+    // 🔹 Update user: set lastQuizTakenAt = now, increment totalQuizzes and redeemPoints
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        lastQuizTakenAt: new Date(),
+        totalQuizzes: { increment: 1 },
+        redeemPoints: { increment: score },
+      },
+      select: {
+        id: true,
+        lastQuizTakenAt: true,
+        totalQuizzes: true,
+        redeemPoints: true,
+      },
+    });
+
+    res.status(200).json({
+      message: "Quiz submitted successfully",
+      userStats: updatedUser,
+    });
+  } catch (err) {
+    console.error("Error submitting quiz:", err);
+    res.status(500).json({ error: "Failed to submit quiz" });
   }
 };
 
@@ -231,82 +313,6 @@ async function getSignedUrl(fileName) {
 }
 
 // --------------------
-// GET /media?page=1&limit=10&type=VIDEO
-// --------------------
-export const media = async (req, res) => {
-  try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
-    const type = req.query.type || "VIDEO"; // default
-
-    const videos = await prisma.video.findMany({
-      skip,
-      take: limit,
-      where: { type },
-      include: { comments: true },
-      orderBy: { createdAt: "desc" },
-    });
-
-    // attach signed GCS URL
-    const videosWithUrl = await Promise.all(
-      videos.map(async (video) => ({
-        ...video,
-        url: await getSignedUrl(video.fileName),
-      }))
-    );
-
-    const totalCount = await prisma.video.count({ where: { type } });
-
-    res.json({
-      page,
-      limit,
-      type,
-      totalPages: Math.ceil(totalCount / limit),
-      totalCount,
-      videos: videosWithUrl,
-    });
-  } catch (error) {
-    console.error("Error fetching media:", error);
-    res.status(500).json({ error: "Failed to fetch videos" });
-  }
-};
-
-// --------------------
-// POST /media (upload metadata after file upload)
-// --------------------
-export const uploadMedia = async (req, res) => {
-  try {
-    const { title, description, fileName } = req.body;
-
-    if (!title || !fileName) {
-      return res.status(400).json({ error: "title and fileName are required" });
-    }
-
-    // detect type from file path
-    let type = "VIDEO";
-    if (fileName.startsWith("shorts/")) {
-      type = "SHORT";
-    }
-
-    const newVideo = await prisma.video.create({
-      data: {
-        title,
-        description,
-        fileName,
-        type,
-      },
-    });
-
-    res.status(201).json(newVideo);
-  } catch (error) {
-    console.error("Error saving video:", error);
-    res.status(500).json({ error: "Failed to save video data" });
-  }
-};
-
-
-// --------------------
 // PATCH /user/profile (update name + mark isNew = false if true)
 // --------------------
 export async function updateUserProfile(req, res) {
@@ -384,7 +390,19 @@ export async function getUserProfile(req, res) {
         .json({ code: "NOT_FOUND", message: "User not found" });
     }
 
-    return res.json({ user });
+    // ✅ Check if user can take quiz today
+    let canTakeQuiz = true;
+    if (user.lastQuizTakenAt) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const lastTaken = new Date(user.lastQuizTakenAt);
+      lastTaken.setHours(0, 0, 0, 0);
+
+      canTakeQuiz = lastTaken < today;
+    }
+
+    return res.json({ user, canTakeQuiz });
   } catch (error) {
     console.error("getUserProfile:", error);
     return res
@@ -392,3 +410,134 @@ export async function getUserProfile(req, res) {
       .json({ code: "SERVER_ERROR", message: "Unable to fetch user" });
   }
 }
+
+// --------------------
+// POST /user/assets (create or update asset allocation for logged-in user)
+// --------------------
+export const saveUserAssets = async (req, res) => {
+  try {
+    const userId = req.user.userId; // middleware attaches authenticated user
+    const {
+      income,
+      expenses,
+      savings,
+      netWorth,
+      cashFlow,
+      loans,
+      insurance,
+      taxSavings,
+    } = req.body;
+
+    const asset = await prisma.userAsset.upsert({
+      where: { userId },
+      update: {
+        income,
+        expenses,
+        savings,
+        netWorth,
+        cashFlow,
+        loans,
+        insurance,
+        taxSavings,
+      },
+      create: {
+        userId,
+        income,
+        expenses,
+        savings,
+        netWorth,
+        cashFlow,
+        loans,
+        insurance,
+        taxSavings,
+      },
+    });
+
+    res.json({ message: "Assets saved successfully", asset });
+  } catch (error) {
+    console.error("Error saving assets:", error);
+    res.status(500).json({ error: "Failed to save assets" });
+  }
+};
+
+// --------------------
+// GET /user/assets (fetch asset allocation for logged-in user)
+// --------------------
+export const getUserAssets = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    const asset = await prisma.userAsset.findUnique({
+      where: { userId },
+    });
+
+    if (!asset) {
+      return res.status(404).json({ error: "Assets not found" });
+    }
+
+    res.json(asset);
+  } catch (error) {
+    console.error("Error fetching assets:", error);
+    res.status(500).json({ error: "Failed to fetch assets" });
+  }
+};
+
+// --------------------
+// POST /user/assets (create or update asset allocation for logged-in user)
+// --------------------
+export const createGlossaryTerm = async (req, res) => {
+  try {
+    const { tag, word, definition } = req.body;
+
+    if (!tag || !word || !definition) {
+      return res.status(400).json({ error: "All fields are required" });
+    }
+
+    const newTerm = await prisma.glossaryTerm.create({
+      data: { tag, word, definition },
+    });
+
+    res.status(201).json(newTerm);
+  } catch (error) {
+    console.error("Error creating glossary term:", error);
+    res.status(500).json({ error: "Failed to create glossary term" });
+  }
+};
+
+// --------------------
+// GET /glossary?tag=xyz&page=1&limit=10
+// Fetch glossary entries filtered by tag (with pagination)
+// If no tag is provided, return all glossary entries with pagination
+// --------------------
+export const getGlossaryTerms = async (req, res) => {
+  try {
+    const { tag, page = 1, limit = 10 } = req.query;
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const take = parseInt(limit);
+
+    let where = {};
+    if (tag) {
+      where.tag = { equals: tag, mode: "insensitive" };
+    }
+
+    const terms = await prisma.glossaryTerm.findMany({
+      where,
+      skip,
+      take,
+      orderBy: { createdAt: "desc" },
+    });
+
+    const total = await prisma.glossaryTerm.count({ where });
+
+    res.json({
+      page: parseInt(page),
+      limit: parseInt(limit),
+      total,
+      terms,
+    });
+  } catch (error) {
+    console.error("Error fetching glossary terms:", error);
+    res.status(500).json({ error: "Failed to fetch glossary terms" });
+  }
+};

@@ -8,6 +8,7 @@ import {
   getAllAdvisorDetails,
   getAdvisors,
   createAdvisor,
+  getAllTags,
 } from "../controllers/advisor.controller.js";
 
 const router = express.Router();
@@ -20,6 +21,7 @@ router.post("/reviews", reviews);                              //User posts revi
 router.get("/reviews/:advisorId", advisorReview);             //Get all reviews of an advisor with pagination
 router.get("/:advisorId/rating", advisorRating);              //Get average rating of an advisor
 router.post("/advisors", addAdvisor);                        //Admin adds advisor
+router.get("/tags", getAllTags);                        
 
 
 export default router;

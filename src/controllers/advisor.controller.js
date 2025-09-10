@@ -52,6 +52,7 @@ export const getAdvisors = async (req, res) => {
           yearsExperience: advisor.yearsExperience,
           expertiseTags: advisor.expertiseTags,
           certificate: advisor.certificate,
+          fees : advisor.fees,
           imageUrl: advisor.imageUrl
             ? await generateSignedUrl(advisor.imageUrl)
             : null,
@@ -256,3 +257,27 @@ export const getAllAdvisorDetails = async (req, res) => {
 
 
 
+// --------------------
+// GET /api/v1/advisor/tags (fetch all unique expertise tags)
+// --------------------
+export const getAllTags = async (req, res) => {
+  try {
+    // Fetch all advisors with tags
+    const advisors = await prisma.advisor.findMany({
+      select: { expertiseTags: true },
+    });
+
+    // Flatten and deduplicate tags
+    const allTags = [
+      ...new Set(advisors.flatMap((advisor) => advisor.expertiseTags)),
+    ];
+
+    res.json({
+      count: allTags.length,
+      tags: allTags,
+    });
+  } catch (error) {
+    console.error("Error fetching tags:", error);
+    res.status(500).json({ error: "Failed to fetch tags" });
+  }
+};

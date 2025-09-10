@@ -56,11 +56,15 @@ model User {
   referralCode String?
   isNew        Boolean   @default(true)
   kycStatus    KycStatus @default(none)
+  lastQuizTakenAt DateTime?
+  totalQuizzes    Int           @default(0) 
+  redeemPoints    Int           @default(0) 
 
   session      Session?
   conversations Conversation[]
   messages      Message[]
   reviews       Review[]
+  assets        UserAsset?    // 👈 One-to-one
 
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
@@ -70,6 +74,24 @@ enum KycStatus {
   none
   pending
   verified
+}
+
+model UserAsset {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id])
+
+  income      Float    @default(0)
+  expenses    Float    @default(0)
+  savings     Float    @default(0)
+  netWorth    Float    @default(0)
+  cashFlow    Float    @default(0)
+  loans       Float    @default(0)
+  insurance   Float    @default(0)
+  taxSavings  Float    @default(0)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model OTPRequest {
@@ -183,3 +205,16 @@ model Banner {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
+
+
+model GlossaryTerm {
+  id          String   @id @default(uuid())
+  tag         String   // e.g., "nifty", "roi"
+  word        String   // e.g., "50", "Diversification"
+  definition  String   // explanation of the word
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+
