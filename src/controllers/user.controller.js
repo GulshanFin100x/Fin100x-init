@@ -376,6 +376,9 @@ export async function getUserProfile(req, res) {
         kycStatus: true,
         createdAt: true,
         updatedAt: true,
+        lastQuizTakenAt: true,
+        totalQuizzes: true,
+        redeemPoints: true,
         // You can include related data if needed:
         // session: true,
         // conversations: true,
@@ -402,7 +405,7 @@ export async function getUserProfile(req, res) {
       canTakeQuiz = lastTaken < today;
     }
 
-    return res.json({ user, canTakeQuiz });
+    return res.json({ user: { ...user, canTakeQuiz } });
   } catch (error) {
     console.error("getUserProfile:", error);
     return res
