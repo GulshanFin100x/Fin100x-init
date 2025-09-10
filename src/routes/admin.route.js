@@ -1,14 +1,16 @@
 import express from "express";
 import { protectRoute } from "../middleware/auth.middleware.js";
 import {
-    createQuiz
+  createQuiz,
+  createGlossaryTerm,
 } from "../controllers/admin.controller.js";
 
 const router = express.Router();
 
-// router.use(protectRoute);
+
 
 router.post("/quiz", createQuiz);
+router.post("/glossary", createGlossaryTerm);
 // router.post("/onboardAdvisor", onboardAdvisor);
 // router.post("/setBanner", setBanner);
 // router.post("/addShorts", addShorts);

@@ -51,3 +51,25 @@ export const createQuiz = async (req, res) => {
  *   "correct": "optionA"
  * }
  */
+
+// --------------------
+// POST /user/assets (create or update asset allocation for logged-in user)
+// --------------------
+export const createGlossaryTerm = async (req, res) => {
+  try {
+    const { tag, word, definition } = req.body;
+
+    if (!tag || !word || !definition) {
+      return res.status(400).json({ error: "All fields are required" });
+    }
+
+    const newTerm = await prisma.glossaryTerm.create({
+      data: { tag, word, definition },
+    });
+
+    res.status(201).json(newTerm);
+  } catch (error) {
+    console.error("Error creating glossary term:", error);
+    res.status(500).json({ error: "Failed to create glossary term" });
+  }
+};

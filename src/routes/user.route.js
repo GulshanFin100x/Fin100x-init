@@ -8,13 +8,14 @@ import {
   updateUserProfile,
   saveUserAssets,
   getUserAssets,
-  createGlossaryTerm,
   getGlossaryTerms,
   getUserProfile,
   submitQuiz,
 } from "../controllers/user.controller.js";
 
 const router = express.Router();
+
+router.get("/glossary", getGlossaryTerms);
 
 router.use(protectRoute);
 
@@ -27,9 +28,6 @@ router.get("/quiz", getQuiz);
 router.post("/quiz", submitQuiz);
 router.post("/assets", saveUserAssets);
 router.get("/assets", getUserAssets);
-router.post("/glossary", createGlossaryTerm);
-router.get("/glossary", getGlossaryTerms);
-
 
 
 export default router;

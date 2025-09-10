@@ -66,7 +66,13 @@ export const getQuiz = async (req, res) => {
 export const submitQuiz = async (req, res) => {
   try {
     const userId = req.user?.userId;
-    const { score } = req.body; // 👈 frontend sends score
+    const score = req.body?.score;  
+
+    if (score === undefined || score === null) {
+      return res
+        .status(400)
+        .json({ code: "MISSING_SCORE", message: "Score is required" });
+    }
 
     if (!userId) {
       return res
@@ -482,28 +488,6 @@ export const getUserAssets = async (req, res) => {
   } catch (error) {
     console.error("Error fetching assets:", error);
     res.status(500).json({ error: "Failed to fetch assets" });
-  }
-};
-
-// --------------------
-// POST /user/assets (create or update asset allocation for logged-in user)
-// --------------------
-export const createGlossaryTerm = async (req, res) => {
-  try {
-    const { tag, word, definition } = req.body;
-
-    if (!tag || !word || !definition) {
-      return res.status(400).json({ error: "All fields are required" });
-    }
-
-    const newTerm = await prisma.glossaryTerm.create({
-      data: { tag, word, definition },
-    });
-
-    res.status(201).json(newTerm);
-  } catch (error) {
-    console.error("Error creating glossary term:", error);
-    res.status(500).json({ error: "Failed to create glossary term" });
   }
 };
 
