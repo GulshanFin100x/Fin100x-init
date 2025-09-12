@@ -8,16 +8,16 @@ import {
   updateUserProfile,
   saveUserAssets,
   getUserAssets,
-  getGlossaryTerms,
   getUserProfile,
   submitQuiz,
   getGlossaryTerms,
+  getGlossaryTags,
 } from "../controllers/user.controller.js";
 
 const router = express.Router();
 
 router.get("/glossary", getGlossaryTerms);
-router.get("/glossary/tags", getGlossaryTerms);
+router.get("/glossary/tags", getGlossaryTags);
 
 router.use(protectRoute);
 
