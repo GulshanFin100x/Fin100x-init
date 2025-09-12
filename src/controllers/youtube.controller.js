@@ -4,7 +4,13 @@ const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
 
 export const fetchYouTubeVideos = async (req, res) => {
   try {
-    const { tag, channelId, sortBy = "date", maxResults = 12 } = req.query;
+    const {
+      tag,
+      channelId,
+      sortBy = "date",
+      maxResults = 12,
+      videoType = "short",
+    } = req.query;
     if (!tag)
       return res
         .status(400)
@@ -17,9 +23,18 @@ export const fetchYouTubeVideos = async (req, res) => {
       maxResults: Number(maxResults),
       key: YOUTUBE_API_KEY,
       order: sortBy,
-      videoDuration: "short",
     };
+
     if (channelId) params.channelId = channelId;
+
+    if (
+      videoType === "short" ||
+      videoType === "medium" ||
+      videoType === "long"
+    ) {
+      params.videoDuration = videoType;
+    }
+    // if videoType is 'all' or other, do not add videoDuration filter
 
     const searchUrl = "https://www.googleapis.com/youtube/v3/search";
     const searchResponse = await axios.get(searchUrl, { params });
