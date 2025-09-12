@@ -528,3 +528,25 @@ export const getGlossaryTerms = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch glossary terms" });
   }
 };
+
+// --------------------
+// GET /glossary/tags (fetch all unique tags)
+// --------------------
+export const getGlossaryTags = async (req, res) => {
+  try {
+    const tags = await prisma.glossaryTerm.findMany({
+      select: { tag: true },
+      distinct: ["tag"], // ✅ ensures unique tags only
+      orderBy: { tag: "asc" },
+    });
+
+    res.status(200).json({
+      message: "Glossary tags fetched successfully",
+      tags: tags.map((t) => t.tag),
+    });
+  } catch (err) {
+    console.error("Error fetching glossary tags:", err);
+    res.status(500).json({ error: "Failed to fetch glossary tags" });
+  }
+};
+

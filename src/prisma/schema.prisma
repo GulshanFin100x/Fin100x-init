@@ -119,30 +119,6 @@ model Session {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-model Video {
-  id          String    @id @default(cuid())
-  title       String
-  description String?
-  fileName    String    // e.g. "videos/abc123.mp4" OR "shorts/xyz456.mp4"
-  type        VideoType @default(VIDEO)   // ✅ distinguishes between long videos & shorts
-  likes       Int       @default(0)
-  comments    Comment[]
-  createdAt   DateTime  @default(now())
-}
-
-enum VideoType {
-  VIDEO
-  SHORT
-}
-
-model Comment {
-  id        String   @id @default(cuid())
-  content   String
-  videoId   String
-  video     Video    @relation(fields: [videoId], references: [id])
-  createdAt DateTime @default(now())
-}
-
 model Conversation {
   id        String   @id @default(uuid())
   title     String

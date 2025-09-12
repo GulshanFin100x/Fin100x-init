@@ -11,11 +11,13 @@ import {
   getGlossaryTerms,
   getUserProfile,
   submitQuiz,
+  getGlossaryTerms,
 } from "../controllers/user.controller.js";
 
 const router = express.Router();
 
 router.get("/glossary", getGlossaryTerms);
+router.get("/glossary/tags", getGlossaryTerms);
 
 router.use(protectRoute);
 
