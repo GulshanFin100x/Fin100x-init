@@ -111,4 +111,115 @@ export const createAdvisor = async (req, res) => {
 };
 
 
+export const getAdvisors = async (req, res) => {
+  try {
+    let { page = 1, limit = 10 } = req.query;
+    page = parseInt(page);
+    limit = parseInt(limit);
+
+    const skip = (page - 1) * limit;
+
+    // Fetch advisors with only required fields
+    const advisors = await prisma.advisor.findMany({
+      skip,
+      take: limit,
+      select: {
+        id : true,
+        salutation: true,
+        firstName: true,
+        lastName: true,
+        yearsExperience: true,
+        fees: true,
+      },
+    });
+
+    // Total count for pagination
+    const totalAdvisors = await prisma.advisor.count();
+
+    res.status(200).json({
+      message: "Advisors fetched successfully",
+      pagination: {
+        total: totalAdvisors,
+        page,
+        limit,
+        totalPages: Math.ceil(totalAdvisors / limit),
+      },
+      data: advisors,
+    });
+  } catch (err) {
+    console.error("Error fetching advisors:", err);
+    res.status(500).json({ error: "Failed to fetch advisors" });
+  }
+};
+
+
+// --------------------
+// GET /advisors/:id (fetch advisor details by ID)
+// --------------------
+export const getAdvisorById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const advisor = await prisma.advisor.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        imageUrl: true,
+        salutation: true,
+        firstName: true,
+        lastName: true,
+        designation: true,
+        yearsExperience: true,
+        expertiseTags: true,
+        certificate: true,
+        fees: true,
+        reviews: {
+          select: {
+            rating: true,
+            comment: true,
+            user: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!advisor) {
+      return res.status(404).json({ error: "Advisor not found" });
+    }
+
+    // Format reviews (flatten user info)
+    const reviews = advisor.reviews.map((r) => ({
+      userId: r.user.id,
+      userName: r.user.name,
+      rating: r.rating,
+      comment: r.comment,
+    }));
+
+    res.status(200).json({
+      message: "Advisor fetched successfully",
+      advisor: {
+        imageUrl: advisor.imageUrl,
+        salutation: advisor.salutation,
+        firstName: advisor.firstName,
+        lastName: advisor.lastName,
+        designation: advisor.designation,
+        yearsExperience: advisor.yearsExperience,
+        expertiseTags: advisor.expertiseTags,
+        certificate: advisor.certificate,
+        fees: advisor.fees,
+        reviews,
+      },
+    });
+  } catch (err) {
+    console.error("Error fetching advisor by ID:", err);
+    res.status(500).json({ error: "Failed to fetch advisor" });
+  }
+};
+
+
 
