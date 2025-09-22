@@ -59,14 +59,13 @@ export const getQuiz = async (req, res) => {
   }
 };
 
-
 // --------------------
 // Submit Quiz Controller
 // --------------------
 export const submitQuiz = async (req, res) => {
   try {
     const userId = req.user?.userId;
-    const score = req.body?.score;  
+    const score = req.body?.score;
 
     if (score === undefined || score === null) {
       return res
@@ -81,12 +80,10 @@ export const submitQuiz = async (req, res) => {
     }
 
     if (typeof score !== "number" || score < 0) {
-      return res
-        .status(400)
-        .json({
-          code: "INVALID_INPUT",
-          message: "Score must be a positive number",
-        });
+      return res.status(400).json({
+        code: "INVALID_INPUT",
+        message: "Score must be a positive number",
+      });
     }
 
     // 🔹 Update user: set lastQuizTakenAt = now, increment totalQuizzes and redeemPoints
@@ -120,7 +117,7 @@ export const submitQuiz = async (req, res) => {
 // --------------------
 export const conversations = async (req, res) => {
   try {
-    const userId = req.user.userId; 
+    const userId = req.user.userId;
 
     const conversations = await prisma.conversation.findMany({
       where: { userId },
@@ -252,9 +249,9 @@ export const chatWithBot = async (req, res) => {
     const apiPayload = {
       user_id: userId,
       conversation_id: convId,
-      messages: [...context, { role: "user", content: query }],
+      // messages: [...context, { role: "user", content: query }],
+      messages: [{ role: "user", content: query }],
     };
-
 
     // const apiResponse = await axios.post(
     //   "https://your-external-api.com/chat",
@@ -263,27 +260,29 @@ export const chatWithBot = async (req, res) => {
     // );
     // const responseText = apiResponse.data.reply || "No response from API";
 
-    
+    let responseText = "No response from AI agent";
 
-    // Call Python AI agent
-    const response = await axios.post(
-      process.env.PYTHON_AGENT_URL || "http://34.29.149.253:8000/chat",
-      apiPayload,
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.PYTHON_AGENT_API_KEY}`,
-          "Content-Type": "application/json",
-          "X-User-ID": userId,
-        },
-        timeout: 30000,
-      }
-    );
+    try {
+      // Call Python AI agent
+      const response = await axios.post(
+        process.env.PYTHON_AGENT_URL || "http://34.29.149.253:8000/chat",
+        apiPayload,
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.PYTHON_AGENT_API_KEY}`,
+            "Content-Type": "application/json",
+            "X-User-ID": userId,
+          },
+          timeout: 30000,
+        }
+      );
 
-    
+      responseText = response.data?.response || responseText;
+    } catch (error) {
+      console.error("Error calling Python AI agent:", error.message);
+    }
 
-    const responseText = response.data?.response || "No response from AI agent";
-
-    console.log(responseText);
+    // console.log(responseText);
 
     // Encrypt and save
     const encQuery = encrypt(query);
@@ -415,8 +414,6 @@ export const chatWithBot = async (req, res) => {
 // Google Cloud Storage Config
 // --------------------
 
-
-
 const storage = new Storage({
   projectId: process.env.GCP_PROJECT_ID,
   keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
@@ -434,7 +431,10 @@ async function getSignedUrl(fileName) {
     expires: Date.now() + 15 * 60 * 1000, // 15 minutes
   };
 
-  const [url] = await storage.bucket(bucketName).file(fileName).getSignedUrl(options);
+  const [url] = await storage
+    .bucket(bucketName)
+    .file(fileName)
+    .getSignedUrl(options);
   return url;
 }
 
@@ -472,7 +472,6 @@ export async function updateUserProfile(req, res) {
       .json({ code: "SERVER_ERROR", message: "Unable to update profile" });
   }
 }
-
 
 // --------------------
 // GET /user/profile
@@ -669,4 +668,3 @@ export const getGlossaryTags = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch glossary tags" });
   }
 };
-
