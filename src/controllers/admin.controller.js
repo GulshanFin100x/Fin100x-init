@@ -73,3 +73,42 @@ export const createGlossaryTerm = async (req, res) => {
     res.status(500).json({ error: "Failed to create glossary term" });
   }
 };
+
+
+export const createAdvisor = async (req, res) => {
+  try {
+    const {
+      salutation,
+      firstName,
+      lastName,
+      designation,
+      yearsExperience,
+      expertiseTags,
+      certificate,
+      fees,
+      imageUrl, // we’ll replace this later with GCP signed URL
+    } = req.body;
+
+    const advisor = await prisma.advisor.create({
+      data: {
+        salutation,
+        firstName,
+        lastName,
+        designation,
+        yearsExperience: yearsExperience || 0,
+        expertiseTags,
+        certificate,
+        fees: fees || 0,
+        imageUrl, // this will be the uploaded image URL from GCP
+      },
+    });
+
+    res.status(201).json(advisor);
+  } catch (error) {
+    console.error("Error creating advisor:", error);
+    res.status(500).json({ error: "Failed to create advisor" });
+  }
+};
+
+
+

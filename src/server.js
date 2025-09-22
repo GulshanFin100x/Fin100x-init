@@ -27,7 +27,6 @@ app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/banner", bannerRoutes);
 app.use("/api/v1/youtube", youtubeRoutes);
 
-// app.get("/profile", protectRoute);
 
 
 app.listen(PORT, "0.0.0.0", () => {

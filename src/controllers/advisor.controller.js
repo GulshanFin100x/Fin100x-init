@@ -1,5 +1,9 @@
 import prisma from "../lib/prisma.js";
 import { generateSignedUrl } from "../utils/gcp.js";
+import {
+  createMeetingWithGoogleMeet,
+  getAdvisorScheduleFromGoogle,
+} from "../utils/googleCalendar.js";
 
 
 export const getAdvisors = async (req, res) => {
@@ -79,39 +83,6 @@ export const getAdvisors = async (req, res) => {
   }
 };
 
-export const createAdvisor = async (req, res) => {
-  try {
-    const {
-      salutation,
-      firstName,
-      lastName,
-      designation,
-      yearsExperience,
-      expertiseTags,
-      certificate,
-      imageUrl,
-    } = req.body;
-
-    const advisor = await prisma.advisor.create({
-      data: {
-        salutation,
-        firstName,
-        lastName,
-        designation,
-        yearsExperience: yearsExperience || 0,
-        expertiseTags,
-        certificate,
-        imageUrl,
-        kycStatus: kycStatus || "none",
-      },
-    });
-
-    res.status(201).json(advisor);
-  } catch (error) {
-    console.error("Error creating advisor:", error);
-    res.status(500).json({ error: "Failed to create advisor" });
-  }
-};
 
 export const reviews = async (req, res) => {
   try {
@@ -198,64 +169,6 @@ export const advisorRating = async (req, res) => {
     }
 };
 
-export const addAdvisor = async (req, res) => {
-    try {
-        const { salutation, firstName, lastName, designation, yearsExperience, expertiseTags, role } = req.body;
-
-        const advisor = await prisma.advisor.create({
-            data: {
-                salutation,
-                firstName,
-                lastName,
-                designation,
-                yearsExperience,
-                expertiseTags,
-                role,
-            },
-        });
-
-        res.status(201).json(advisor);
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: error.message });
-    }
-};
-
-// POST /api/v1/advisor/getAllAdvisorDetails?page=1&limit=5
-export const getAllAdvisorDetails = async (req, res) => {
-  try {
-    // get pagination params (from query or body, I’ll use query)
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 5;
-
-    const skip = (page - 1) * limit;
-
-    // fetch advisors with pagination
-    const advisors = await prisma.advisor.findMany({
-      skip,
-      take: limit,
-      include: {
-        reviews: true, // if you want advisor reviews as well
-      },
-    });
-
-    // count total advisors for pagination info
-    const totalAdvisors = await prisma.advisor.count();
-
-    res.json({
-      page,
-      limit,
-      totalAdvisors,
-      totalPages: Math.ceil(totalAdvisors / limit),
-      advisors,
-    });
-  } catch (error) {
-    console.error("Error fetching advisors:", error);
-    res.status(500).json({ message: "Server Error" });
-  }
-};
-
-
 
 // --------------------
 // GET /api/v1/advisor/tags (fetch all unique expertise tags)
@@ -281,3 +194,104 @@ export const getAllTags = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch tags" });
   }
 };
+
+
+
+
+// Start of changes by Suyash 
+
+export const bookCallWithAdvisor = async (req, res) => {
+  try {
+    const { userId, advisorId, startTime, endTime } = req.body;
+
+    if (!userId || !advisorId || !startTime || !endTime) {
+      return res
+        .status(400)
+        .json({ error: "Missing required fields in request body" });
+    }
+
+    // Fetch user and advisor to get their emails (assuming you store emails in separate place or get from elsewhere)
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    const advisor = await prisma.advisor.findUnique({
+      where: { id: advisorId },
+    });
+
+    if (!user || !advisor) {
+      return res.status(400).json({ error: "Invalid userId or advisorId" });
+    }
+
+    // For demonstration, assume user and advisor email are stored in phone (replace as per your data)
+    // In real use, you should add proper email fields or pass emails explicitly
+    // const userEmail = user.phone + "@example.com"; // Placeholder mapping
+    const userEmail = "gulshan@fin100x.ai";
+    const advisorEmail =
+      advisor.yearsExperience > 0
+        ? "advisor@example.com"
+        : "advisor@example.com"; // Replace accordingly
+
+    console.log("User Email:", userEmail);
+    console.log("Advisor Email:", advisorEmail);
+
+    const event = await createMeetingWithGoogleMeet({
+      summary: "Advisor Consultation Call",
+      description: `Meeting booked by user ${userId}`,
+      attendeesEmails: [userEmail, advisorEmail],
+      startDateTime: startTime,
+      endDateTime: endTime,
+    });
+
+    const meeting = await prisma.meeting.create({
+      data: {
+        userId,
+        advisorId,
+        meetLink: event.conferenceData.entryPoints[0].uri,
+        eventId: event.id,
+        startTime: new Date(startTime),
+        endTime: new Date(endTime),
+      },
+    });
+
+    res.json({ success: true, meeting });
+  } catch (error) {
+    console.error("Book call error:", error);
+    res.status(500).json({ error: "Failed to book call" });
+  }
+};
+
+export const getAdvisorCalendarSchedule = async (req, res) => {
+  try {
+    const { advisorId, timeMin, timeMax } = req.query;
+
+    if (!advisorId || !timeMin || !timeMax) {
+      return res
+        .status(400)
+        .json({ error: "Missing required query parameters" });
+    }
+
+    const advisor = await prisma.advisor.findUnique({
+      where: { id: advisorId },
+    });
+    if (!advisor) {
+      return res.status(400).json({ error: "Invalid advisorId" });
+    }
+
+    // Use a fixed calendar id or advisor email if you have (using 'primary' here as placeholder)
+    // Replace with actual calendarId if available
+
+
+    const calendarId = "primary";
+
+    const events = await getAdvisorScheduleFromGoogle({
+      calendarId,
+      timeMin,
+      timeMax,
+    });
+
+    res.json({ events });
+  } catch (error) {
+    console.error("Fetch schedule error:", error);
+    res.status(500).json({ error: "Failed to fetch advisor schedule." });
+  }
+};
+
+//End of changes by Suyash

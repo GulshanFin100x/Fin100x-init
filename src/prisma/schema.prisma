@@ -23,7 +23,7 @@ model Advisor {
   fees            Float    @default(0)   // in INR
   // Relations
   reviews         Review[]   // one advisor can have many reviews
-
+  meetings     Meeting[]    //++ Suyash
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }
@@ -64,7 +64,9 @@ model User {
   conversations Conversation[]
   messages      Message[]
   reviews       Review[]
-  assets        UserAsset?    // 👈 One-to-one
+  assets        UserAsset?    
+
+  meetings     Meeting[]    //++ Suyash
 
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
@@ -193,4 +195,21 @@ model GlossaryTerm {
   updatedAt   DateTime @updatedAt
 }
 
+//Start of changes by Suyash
+model Meeting {
+  id          Int      @id @default(autoincrement())
+  userId      String
+  advisorId   String
+  meetLink    String
+  eventId     String   // Optional Google event ID
+  startTime   DateTime
+  endTime     DateTime
+  conferenceRecordId String? // Add this for Google Meet Conference Record
+  transcript      String?
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id])
+  advisor     Advisor  @relation(fields: [advisorId], references: [id])
+}
+//End of changes by Suyash
 
