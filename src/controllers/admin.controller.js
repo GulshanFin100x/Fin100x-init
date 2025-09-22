@@ -1,5 +1,5 @@
 import prisma from "../lib/prisma.js";
-
+import { generateSignedUrl } from "../utils/gcp.js";
 /**
  * Create a new quiz
  * Request body:
@@ -192,7 +192,12 @@ export const getAdvisorById = async (req, res) => {
       return res.status(404).json({ error: "Advisor not found" });
     }
 
-    // Format reviews (flatten user info)
+    // Generate signed URL here ⬇️
+    const signedImageUrl = advisor.imageUrl
+      ? await generateSignedUrl(advisor.imageUrl)
+      : null;
+
+    // Format reviews
     const reviews = advisor.reviews.map((r) => ({
       userId: r.user.id,
       userName: r.user.name,
@@ -203,7 +208,8 @@ export const getAdvisorById = async (req, res) => {
     res.status(200).json({
       message: "Advisor fetched successfully",
       advisor: {
-        imageUrl: advisor.imageUrl,
+        id: advisor.id,
+        imageUrl: signedImageUrl, // ✅ use pre-generated signed URL
         salutation: advisor.salutation,
         firstName: advisor.firstName,
         lastName: advisor.lastName,
@@ -220,6 +226,7 @@ export const getAdvisorById = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch advisor" });
   }
 };
+
 
 
 
