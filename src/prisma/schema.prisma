@@ -21,6 +21,7 @@ model Advisor {
   expertiseTags   String[]
   certificate     String
   fees            Float    @default(0)   // in INR
+  email           String? @unique
   // Relations
   reviews         Review[]   // one advisor can have many reviews
   meetings     Meeting[]    //++ Suyash
@@ -59,6 +60,8 @@ model User {
   lastQuizTakenAt DateTime?
   totalQuizzes    Int           @default(0) 
   redeemPoints    Int           @default(0) 
+
+  email           String? @unique
 
   session      Session?
   conversations Conversation[]

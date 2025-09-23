@@ -52,27 +52,6 @@ export const createQuiz = async (req, res) => {
  * }
  */
 
-// --------------------
-// POST /user/assets (create or update asset allocation for logged-in user)
-// --------------------
-export const createGlossaryTerm = async (req, res) => {
-  try {
-    const { tag, word, definition } = req.body;
-
-    if (!tag || !word || !definition) {
-      return res.status(400).json({ error: "All fields are required" });
-    }
-
-    const newTerm = await prisma.glossaryTerm.create({
-      data: { tag, word, definition },
-    });
-
-    res.status(201).json(newTerm);
-  } catch (error) {
-    console.error("Error creating glossary term:", error);
-    res.status(500).json({ error: "Failed to create glossary term" });
-  }
-};
 
 
 export const createAdvisor = async (req, res) => {
@@ -226,6 +205,104 @@ export const getAdvisorById = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch advisor" });
   }
 };
+
+
+// --------------------
+// CREATE GlossaryTerm
+// --------------------
+export const createGlossaryTerm = async (req, res) => {
+  try {
+    const { tag, word, definition } = req.body;
+
+    if (!tag || !word || !definition) {
+      return res.status(400).json({ error: "All fields are required" });
+    }
+
+    const newTerm = await prisma.glossaryTerm.create({
+      data: { tag, word, definition },
+    });
+
+    res.status(201).json(newTerm);
+  } catch (error) {
+    console.error("Error creating glossary term:", error);
+    res.status(500).json({ error: "Failed to create glossary term" });
+  }
+};
+
+// --------------------
+// GET All GlossaryTerms
+// --------------------
+export const getAllGlossaryTerms = async (req, res) => {
+  try {
+    // Get query params (default: page=1, limit=10)
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+
+    // Calculate offset
+    const skip = (page - 1) * limit;
+
+    // Fetch paginated terms
+    const [terms, total] = await Promise.all([
+      prisma.glossaryTerm.findMany({
+        skip,
+        take: limit,
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.glossaryTerm.count(),
+    ]);
+
+    res.json({
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+      data: terms,
+    });
+  } catch (error) {
+    console.error("Error fetching glossary terms:", error);
+    res.status(500).json({ error: "Failed to fetch glossary terms" });
+  }
+};
+
+// --------------------
+// UPDATE GlossaryTerm
+// --------------------
+export const updateGlossaryTerm = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { tag, word, definition } = req.body;
+
+    const updatedTerm = await prisma.glossaryTerm.update({
+      where: { id },
+      data: { tag, word, definition },
+    });
+
+    res.json(updatedTerm);
+  } catch (error) {
+    console.error("Error updating glossary term:", error);
+    res.status(500).json({ error: "Failed to update glossary term" });
+  }
+};
+
+// --------------------
+// DELETE GlossaryTerm
+// --------------------
+export const deleteGlossaryTerm = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    await prisma.glossaryTerm.delete({
+      where: { id },
+    });
+
+    res.json({ message: "Glossary term deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting glossary term:", error);
+    res.status(500).json({ error: "Failed to delete glossary term" });
+  }
+};
+
+
 
 
 
