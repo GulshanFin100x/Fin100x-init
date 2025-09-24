@@ -103,11 +103,14 @@ export const getAdvisors = async (req, res) => {
       skip,
       take: limit,
       select: {
-        id : true,
+        id: true,
         salutation: true,
         firstName: true,
         lastName: true,
+        designation: true,
         yearsExperience: true,
+        expertiseTags: true,
+        certificate: true,
         fees: true,
       },
     });
@@ -152,6 +155,7 @@ export const getAdvisorById = async (req, res) => {
         expertiseTags: true,
         certificate: true,
         fees: true,
+        email: true,
         reviews: {
           select: {
             rating: true,
@@ -197,6 +201,7 @@ export const getAdvisorById = async (req, res) => {
         expertiseTags: advisor.expertiseTags,
         certificate: advisor.certificate,
         fees: advisor.fees,
+        email: advisor.email,
         reviews,
       },
     });

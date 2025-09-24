@@ -21,7 +21,8 @@ model Advisor {
   expertiseTags   String[]
   certificate     String
   fees            Float    @default(0)   // in INR
-  email           String? @unique
+  email           String?   @unique  //++ Suyash
+  calenderId      String?   @unique //++ Suyash
   // Relations
   reviews         Review[]   // one advisor can have many reviews
   meetings     Meeting[]    //++ Suyash
