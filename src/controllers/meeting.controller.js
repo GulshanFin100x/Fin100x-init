@@ -1,39 +1,29 @@
 import prisma from "../lib/prisma.js";
 import { fetchMeetingTranscriptComplete } from "../utils/googleCalendar.js";
-// Keep your existing getNextMeetingLink function as is, just add transcript to response
-export const getNextMeetingLink = async (req, res) => {
-  try {
-    const { userId, advisorId, fromTime } = req.query;
 
-    if (!userId && !advisorId) {
-      return res
-        .status(400)
-        .json({ error: "Either userId or advisorId is required" });
+
+export const getNextMeetingForUser = async (req, res) => {
+  try {
+    const { userId } = req.query;
+
+    if (!userId) {
+      return res.status(400).json({ error: "userId is required" });
     }
 
-    const startFilterTime = fromTime ? new Date(fromTime) : new Date();
-
-    const whereClause = {
-      AND: [
-        {
-          OR: [
-            userId ? { userId } : undefined,
-            advisorId ? { advisorId } : undefined,
-          ].filter(Boolean),
-        },
-        {
-          startTime: { gte: startFilterTime },
-        },
-      ],
-    };
+    const now = new Date();
 
     const nextMeeting = await prisma.meeting.findFirst({
-      where: whereClause,
+      where: {
+        userId,
+        startTime: { gte: now },
+      },
       orderBy: { startTime: "asc" },
     });
 
     if (!nextMeeting) {
-      return res.status(404).json({ message: "No upcoming meetings found" });
+      return res
+        .status(404)
+        .json({ message: "No upcoming meetings found for user" });
     }
 
     res.json({
@@ -42,7 +32,7 @@ export const getNextMeetingLink = async (req, res) => {
       startTime: nextMeeting.startTime,
       endTime: nextMeeting.endTime,
       eventId: nextMeeting.eventId,
-      transcript: nextMeeting.transcript, // Add this line
+      transcript: nextMeeting.transcript,
     });
   } catch (error) {
     console.error("Error fetching next meeting:", error);

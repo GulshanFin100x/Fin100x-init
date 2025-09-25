@@ -21,6 +21,9 @@ export async function createMeetingWithGoogleMeet({
     start: { dateTime: startDateTime, timeZone: timezone },
     end: { dateTime: endDateTime, timeZone: timezone },
     attendees: attendeesEmails.map((email) => ({ email })),
+    visibility: "private",
+    guestsCanInviteOthers: false,
+    guestsCanModify: false,
     conferenceData: {
       createRequest: {
         requestId: `req-${Date.now()}`,
@@ -37,6 +40,7 @@ export async function createMeetingWithGoogleMeet({
 
   return response.data;
 }
+
 
 export async function getAdvisorScheduleFromGoogle({
   calendarId,
@@ -202,3 +206,5 @@ export async function fetchMeetingTranscriptComplete(
     throw error;
   }
 }
+
+

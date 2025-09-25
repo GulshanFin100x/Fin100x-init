@@ -253,6 +253,11 @@ export const chatWithBot = async (req, res) => {
       messages: [{ role: "user", content: query }],
     };
 
+    // // Prepare payload as per your Python API contract
+    // const apiPayload = {
+    //   user_input: query, // <-- here you send { user_input: "Example of SIP" } as required
+    // };
+
     // const apiResponse = await axios.post(
     //   "https://your-external-api.com/chat",
     //   apiPayload,
@@ -311,104 +316,6 @@ export const chatWithBot = async (req, res) => {
   }
 };
 
-// export const chatWithBot = async (req, res) => {
-//   try {
-//     const { conversationId, query, userId } = req.body;
-
-//     if (!userId) {
-//       return res.status(400).json({ error: "userId is required" });
-//     }
-
-//     if (!query || query.trim() === "") {
-//       return res.status(400).json({ error: "Query is required" });
-//     }
-
-//     let convId = conversationId;
-//     let convTitle = null;
-
-//     // Create new conversation if missing
-//     if (!convId || convId === "null") {
-//       const title = query.split(" ").slice(0, 5).join(" ");
-//       const newConversation = await prisma.conversation.create({
-//         data: { title, userId },
-//       });
-//       convId = newConversation.id;
-//       convTitle = newConversation.title;
-//     }
-
-//     // Fetch last 5 messages for context
-//     const lastMessages = await prisma.message.findMany({
-//       where: { conversationId: convId },
-//       orderBy: { createdAt: "desc" },
-//       take: 5,
-//       select: { message_query: true, message_response: true },
-//     });
-
-//     const contextMessages = lastMessages
-//       .map((msg) => {
-//         const userMsg = msg.message_query
-//           ? decrypt(JSON.parse(msg.message_query))
-//           : null;
-//         const botMsg = msg.message_response
-//           ? decrypt(JSON.parse(msg.message_response))
-//           : null;
-//         return [
-//           userMsg ? { role: "user", content: userMsg } : null,
-//           botMsg ? { role: "assistant", content: botMsg } : null,
-//         ].filter(Boolean);
-//       })
-//       .flat()
-//       .reverse();
-
-//     const apiPayload = {
-//       user_id: userId,
-//       conversation_id: convId,
-//       messages: [...contextMessages, { role: "user", content: query }],
-//     };
-
-//     // Call Python AI agent
-//     const response = await axios.post(
-//       process.env.PYTHON_AGENT_URL || "http://localhost:8001/chat",
-//       apiPayload,
-//       {
-//         headers: {
-//           Authorization: `Bearer ${process.env.PYTHON_AGENT_API_KEY}`,
-//           "Content-Type": "application/json",
-//           "X-User-ID": userId,
-//         },
-//         timeout: 30000,
-//       }
-//     );
-
-//     const responseText = response.data?.response || "No response from AI agent";
-
-//     // Encrypt + save
-//     const encQuery = encrypt(query);
-//     const encResponse = encrypt(responseText);
-
-//     const message = await prisma.message.create({
-//       data: {
-//         message_query: JSON.stringify(encQuery),
-//         message_response: JSON.stringify(encResponse),
-//         is_bot: true,
-//         is_encrypted: true,
-//         conversation: { connect: { id: convId } },
-//         user: { connect: { id: userId } },
-//       },
-//     });
-
-//     res.json({
-//       conversationId: convId,
-//       conversationTitle: convTitle,
-//       messageId: message.id,
-//       botResponse: responseText,
-//       timestamp: new Date().toISOString(),
-//     });
-//   } catch (err) {
-//     console.error("Error in chatWithBot:", err?.response?.data || err);
-//     res.status(500).json({ error: "Internal server error" });
-//   }
-// };
 
 // --------------------
 // Google Cloud Storage Config

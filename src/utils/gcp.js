@@ -1,11 +1,13 @@
 import { Storage } from "@google-cloud/storage";
 
-const storage = new Storage({
+export const storage = new Storage({
   projectId: process.env.GCP_PROJECT_ID,
   keyFilename: process.env.GCP_KEYFILE_PATH, // service account JSON file
 });
 
 const bucketName = process.env.GCP_BUCKET_NAME;
+
+export const bucket = storage.bucket(bucketName);
 
 // Generate signed URL
 export async function generateSignedUrl(fileName) {

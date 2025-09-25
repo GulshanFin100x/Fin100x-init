@@ -1,16 +1,6 @@
 import prisma from "../lib/prisma.js";
-import { generateSignedUrl } from "../utils/gcp.js";
-/**
- * Create a new quiz
- * Request body:
- * {
- *   "title": "Finance Basics",
- *   "questions": [
- *      { "text": "2+2?", "optionA": "3", "optionB": "4", "optionC": "5", "optionD": "6", "correct": "optionB" },
- *      { "text": "Capital of India?", "optionA": "Mumbai", "optionB": "Delhi", "optionC": "Kolkata", "optionD": "Chennai",           "correct": "optionB" }
- *   ]
- * }
- */
+import { bucket, generateSignedUrl } from "../utils/gcp.js";
+
 export const createQuiz = async (req, res) => {
   try {
     const { title, questions } = req.body;
@@ -39,20 +29,6 @@ export const createQuiz = async (req, res) => {
   }
 };
 
-/**
- * Add a single question to an existing quiz
- * Request body:
- * {
- *   "text": "Who is CEO of Tesla?",
- *   "optionA": "Elon Musk",
- *   "optionB": "Jeff Bezos",
- *   "optionC": "Bill Gates",
- *   "optionD": "Mark Zuckerberg",
- *   "correct": "optionA"
- * }
- */
-
-
 
 export const createAdvisor = async (req, res) => {
   try {
@@ -65,8 +41,34 @@ export const createAdvisor = async (req, res) => {
       expertiseTags,
       certificate,
       fees,
-      imageUrl, // we’ll replace this later with GCP signed URL
+      email,
     } = req.body;
+
+    let parsedTags = [];
+    if (expertiseTags) {
+      try {
+        parsedTags = JSON.parse(expertiseTags); // ✅ parse string to array
+      } catch {
+        parsedTags = [];
+      }
+    }
+
+    let imageUrl = null;
+
+    // if image uploaded via multipart/form-data
+    if (req.file) {
+      // const file = bucket.file(
+      //   `advisor/${Date.now()}-${req.file.originalname}`
+      // );
+      const file = bucket.file(
+        `advisor/${req.file.originalname}`
+      );
+      await file.save(req.file.buffer, {
+        contentType: req.file.mimetype,
+      });
+
+      imageUrl = `advisor/${req.file.originalname}`;
+    }
 
     const advisor = await prisma.advisor.create({
       data: {
@@ -74,15 +76,17 @@ export const createAdvisor = async (req, res) => {
         firstName,
         lastName,
         designation,
-        yearsExperience: yearsExperience || 0,
-        expertiseTags,
+        yearsExperience: Number(yearsExperience) || 0,
+        expertiseTags: parsedTags || [],
         certificate,
-        fees: fees || 0,
-        imageUrl, // this will be the uploaded image URL from GCP
+        yearsExperience: Number(yearsExperience) || 0,
+        email,
+        fees: Number(fees) || 0,
+        imageUrl,
       },
     });
 
-    res.status(201).json(advisor);
+    res.status(201).json({ message: "Advisor created", advisor });
   } catch (error) {
     console.error("Error creating advisor:", error);
     res.status(500).json({ error: "Failed to create advisor" });
@@ -90,6 +94,79 @@ export const createAdvisor = async (req, res) => {
 };
 
 
+// ---------- UPDATE ADVISOR ----------
+export const updateAdvisor = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      salutation,
+      firstName,
+      lastName,
+      designation,
+      yearsExperience,
+      expertiseTags,
+      certificate,
+      fees,
+      email,
+      calenderId
+    } = req.body;
+
+    console.log("Req body:", req.body);
+
+    // Handle expertiseTags — can be sent as JSON string
+    let parsedTags = [];
+    if (expertiseTags) {
+      try {
+        parsedTags = JSON.parse(expertiseTags);
+      } catch {
+        parsedTags = Array.isArray(expertiseTags) ? expertiseTags : [];
+      }
+    }
+
+    let imageUrl;
+
+    // If user sent a new image
+    if (req.file) {
+      const file = bucket.file(`advisor/${Date.now()}-${req.file.originalname}`);
+      await file.save(req.file.buffer, {
+        contentType: req.file.mimetype,
+      });
+
+      const [signedUrl] = await file.getSignedUrl({
+        action: "read",
+        version: "v4",
+        expires: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 days
+      });
+      imageUrl = signedUrl;
+    }
+
+    const advisor = await prisma.advisor.update({
+      where: { id },
+      data: {
+        ...(salutation && { salutation }),
+        ...(firstName && { firstName }),
+        ...(lastName && { lastName }),
+        ...(designation && { designation }),
+        ...(yearsExperience && { yearsExperience: Number(yearsExperience) }),
+        ...(expertiseTags && { expertiseTags: parsedTags }),
+        ...(certificate && { certificate }),
+        ...(fees && { fees: parseFloat(fees) }),
+        ...(email && { email }),
+        ...(calenderId && { calenderId }),
+        ...(imageUrl && { imageUrl }),
+      },
+    });
+
+    res.status(200).json({ message: "Advisor updated successfully", advisor });
+  } catch (error) {
+    console.error("Error updating advisor:", error);
+    res.status(500).json({ error: "Failed to update advisor" });
+  }
+};
+
+// --------------------
+// GET /advisors (fetch paginated advisors with avg rating & review count)
+// --------------------
 export const getAdvisors = async (req, res) => {
   try {
     let { page = 1, limit = 10 } = req.query;
@@ -104,6 +181,7 @@ export const getAdvisors = async (req, res) => {
       take: limit,
       select: {
         id: true,
+        imageUrl: true,
         salutation: true,
         firstName: true,
         lastName: true,
@@ -114,6 +192,19 @@ export const getAdvisors = async (req, res) => {
         fees: true,
       },
     });
+
+    const data = await Promise.all(
+      advisors.map(async (advisor) => {
+        const signedImageUrl = advisor.imageUrl
+          ? await generateSignedUrl(advisor.imageUrl)
+          : null;
+
+        return {
+          ...advisor,
+          imageUrl: signedImageUrl,
+        };
+      })
+    );
 
     // Total count for pagination
     const totalAdvisors = await prisma.advisor.count();
@@ -126,7 +217,7 @@ export const getAdvisors = async (req, res) => {
         limit,
         totalPages: Math.ceil(totalAdvisors / limit),
       },
-      data: advisors,
+      data: data,
     });
   } catch (err) {
     console.error("Error fetching advisors:", err);
@@ -208,6 +299,32 @@ export const getAdvisorById = async (req, res) => {
   } catch (err) {
     console.error("Error fetching advisor by ID:", err);
     res.status(500).json({ error: "Failed to fetch advisor" });
+  }
+};
+
+// --------------------
+// DELETE /advisors/:id (delete advisor by ID)  
+// --------------------
+export const deleteAdvisor = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Check if advisor exists
+    const advisor = await prisma.advisor.findUnique({ where: { id } });
+    if (!advisor) {
+      return res.status(404).json({ error: "Advisor not found" });
+    }
+
+    // Delete advisor
+    await prisma.advisor.delete({ where: { id } });
+
+    res.status(200).json({
+      message: "Advisor deleted successfully",
+      deletedAdvisorId: id,
+    });
+  } catch (error) {
+    console.error("Error deleting advisor:", error);
+    res.status(500).json({ error: "Failed to delete advisor" });
   }
 };
 
