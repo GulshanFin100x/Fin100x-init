@@ -327,18 +327,29 @@ export const chatWithBot = async (req, res) => {
     const userId = req.user.userId;
 
     if (!query) {
-      console.error("Missing required fields: query");
-      return res
-        .status(400)
-        .json({ error: "Missing required fields: query" });
+      return res.status(400).json({ error: "Query is required" });
     }
 
-    if (!conversationId) {
-      conversationId = uuidv4();
-      console.log(`Generated new conversationId: ${conversationId}`);
+    let convId = conversationId;
+    let convTitle = null;
+
+    // Create conversation if new
+    if (!convId || convId === "null") {
+      const title = query.split(" ").slice(0, 5).join(" ");
+      const newConversation = await prisma.conversation.create({
+        data: { title, userId },
+      });
+      convId = newConversation.id;
+      convTitle = newConversation.title;
     }
 
-    const session_id = `${userId}_${conversationId}`;
+    // if (!conversationId) {
+    //   conversationId = uuidv4();
+    //   console.log(`Generated new conversationId: ${conversationId}`);
+    // }
+
+    // const session_id = `${userId}_${conversationId}`;
+    const session_id = `${userId}_${convId}`;
 
     let session;
     try {
@@ -367,12 +378,13 @@ export const chatWithBot = async (req, res) => {
       conversationId,
     };
 
-    let response;
+    let responseText = "No response from AI agent";
     try {
-      response = await axios.post("http://34.29.149.253:8000/query", payload, {
+      const response = await axios.post("http://34.29.149.253:8000/query", payload, {
         headers: { "Content-Type": "application/json" },
         timeout: 30000,
       });
+      responseText = response.data?.response || responseText;
     } catch (mcpError) {
       console.error("MCP server call error:", mcpError.message || mcpError);
       if (mcpError.response?.data?.response) {
@@ -381,12 +393,34 @@ export const chatWithBot = async (req, res) => {
       return res.status(502).json({ error: "Failed to connect to MCP server" });
     }
 
-    try {
-      return res.json({conversationId, botResponse : response.data});
-    } catch (responseError) {
-      console.error("Response sending error:", responseError);
-      return res.status(500).json({ error: "Failed to send response" });
-    }
+    // Encrypt and save
+    const encQuery = encrypt(query);
+    const encResponse = encrypt(responseText);
+
+    const message = await prisma.message.create({
+      data: {
+        message_query: JSON.stringify(encQuery),
+        message_response: JSON.stringify(encResponse),
+        is_bot: true,
+        is_encrypted: true,
+        conversation: { connect: { id: convId } },
+        user: { connect: { id: userId } },
+      },
+    });
+
+    res.json({
+      conversationId: convId,
+      conversationTitle: convTitle,
+      messageId: message.id,
+      botResponse: responseText,
+    });
+
+    // try {
+    //   return res.json({ conversationId, botResponse: response.data });
+    // } catch (responseError) {
+    //   console.error("Response sending error:", responseError);
+    //   return res.status(500).json({ error: "Failed to send response" });
+    // }
   } catch (err) {
     console.error("Internal server error in chatWithBot:", err);
     return res.status(500).json({ error: "Internal server error" });
