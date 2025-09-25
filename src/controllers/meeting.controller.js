@@ -2,41 +2,63 @@ import prisma from "../lib/prisma.js";
 import { fetchMeetingTranscriptComplete } from "../utils/googleCalendar.js";
 
 
-export const getNextMeetingForUser = async (req, res) => {
+export const getUpcomingMeetingsForUser = async (req, res) => {
   try {
-    const { userId } = req.query;
-
-    if (!userId) {
-      return res.status(400).json({ error: "userId is required" });
-    }
+    
+    const userId = req.query.userId;
 
     const now = new Date();
 
-    const nextMeeting = await prisma.meeting.findFirst({
+    // Fetch all upcoming meetings for the user
+    const upcomingMeetings = await prisma.meeting.findMany({
       where: {
         userId,
         startTime: { gte: now },
       },
       orderBy: { startTime: "asc" },
+      include: {
+        advisor: {
+          select: {
+            salutation: true,
+            firstName: true,
+            lastName: true,
+            designation: true,
+            yearsExperience: true,
+            expertiseTags: true,
+            certificate: true,
+          },
+        },
+      },
     });
 
-    if (!nextMeeting) {
+    if (!upcomingMeetings || upcomingMeetings.length === 0) {
       return res
         .status(404)
         .json({ message: "No upcoming meetings found for user" });
     }
 
-    res.json({
-      meetingId: nextMeeting.id,
-      meetLink: nextMeeting.meetLink,
-      startTime: nextMeeting.startTime,
-      endTime: nextMeeting.endTime,
-      eventId: nextMeeting.eventId,
-      transcript: nextMeeting.transcript,
-    });
+    // Map response
+    const data = upcomingMeetings.map((meeting) => ({
+      meetingId: meeting.id,
+      meetLink: meeting.meetLink,
+      startTime: meeting.startTime,
+      endTime: meeting.endTime,
+      eventId: meeting.eventId,
+      advisor: {
+        salutation: meeting.advisor.salutation,
+        firstName: meeting.advisor.firstName,
+        lastName: meeting.advisor.lastName,
+        designation: meeting.advisor.designation,
+        yearsExperience: meeting.advisor.yearsExperience,
+        expertiseTags: meeting.advisor.expertiseTags,
+        certificate: meeting.advisor.certificate,
+      },
+    }));
+
+    res.json({ meetings: data });
   } catch (error) {
-    console.error("Error fetching next meeting:", error);
-    res.status(500).json({ error: "Failed to fetch next meeting" });
+    console.error("Error fetching upcoming meetings:", error);
+    res.status(500).json({ error: "Failed to fetch upcoming meetings" });
   }
 };
 

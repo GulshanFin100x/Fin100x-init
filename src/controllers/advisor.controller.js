@@ -210,7 +210,7 @@ export const bookCallWithAdvisor = async (req, res) => {
 
     const { advisorId, startTime, endTime } = req.body;
 
-    if (!userId || !advisorId || !startTime || !endTime) {
+    if (!advisorId || !startTime || !endTime) {
       return res
         .status(400)
         .json({ error: "Missing required fields in request body" });
@@ -227,8 +227,12 @@ export const bookCallWithAdvisor = async (req, res) => {
       select: { email: true }  // Select email and needed fields
     });
 
-    if (!user.email || !advisor.email) {
-      return res.status(400).json({ error: "Advisor or User Id mail is not " });
+    if (!user.email) {
+      return res.status(400).json({ error: "User mail is not maintained" });
+    }
+    
+    if (!advisor.email) {
+      return res.status(400).json({ error: "Advisor mail is not maintained" });
     }
 
     const userEmail = user.email;

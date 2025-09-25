@@ -19,7 +19,7 @@ router.get("/:advisorId/rating", advisorRating);              //Get average rati
 router.get("/tags", getAllTags);  
 
 
-// router.use(protectRoute);
+router.use(protectRoute);
 
 
 //Start of changes by Suyash

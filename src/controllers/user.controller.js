@@ -2,7 +2,6 @@ import prisma from "../lib/prisma.js";
 import { encrypt, decrypt } from "../utils/encryption.js";
 import axios from "axios";
 import { Storage } from "@google-cloud/storage";
-import { v4 as uuidv4 } from "uuid";
 
 // --------------------
 // Quiz Controller
@@ -317,8 +316,10 @@ export const messages = async (req, res) => {
 //   }
 // };
 
-//++Suyash
 
+
+
+//Start of Suyash
 
 export const chatWithBot = async (req, res) => {
   try {
@@ -349,6 +350,7 @@ export const chatWithBot = async (req, res) => {
     // }
 
     // const session_id = `${userId}_${conversationId}`;
+
     const session_id = `${userId}_${convId}`;
 
     let session;
@@ -381,14 +383,11 @@ export const chatWithBot = async (req, res) => {
     try {
       const response = await axios.post("http://34.29.149.253:8000/query", payload, {
         headers: { "Content-Type": "application/json" },
-        timeout: 30000,
+        timeout: 60000,
       });
       responseText = response.data?.response || responseText;
     } catch (mcpError) {
       console.error("MCP server call error:", mcpError.message || mcpError);
-      if (mcpError.response?.data?.response) {
-        return res.json({ response: mcpError.response.data.response });
-      }
       return res.status(502).json({ error: "Failed to connect to MCP server" });
     }
 
@@ -414,19 +413,13 @@ export const chatWithBot = async (req, res) => {
       botResponse: responseText,
     });
 
-    // try {
-    //   return res.json({ conversationId, botResponse: response.data });
-    // } catch (responseError) {
-    //   console.error("Response sending error:", responseError);
-    //   return res.status(500).json({ error: "Failed to send response" });
-    // }
   } catch (err) {
     console.error("Internal server error in chatWithBot:", err);
     return res.status(500).json({ error: "Internal server error" });
   }
 };
 
-//++Suyash
+//End of Suyash
 
 
 // --------------------
@@ -437,25 +430,6 @@ const storage = new Storage({
   projectId: process.env.GCP_PROJECT_ID,
   keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
 });
-
-const bucketName = process.env.GCP_BUCKET_NAME;
-
-// --------------------
-// Helper: Get signed READ URL
-// --------------------
-async function getSignedUrl(fileName) {
-  const options = {
-    version: "v4",
-    action: "read",
-    expires: Date.now() + 15 * 60 * 1000, // 15 minutes
-  };
-
-  const [url] = await storage
-    .bucket(bucketName)
-    .file(fileName)
-    .getSignedUrl(options);
-  return url;
-}
 
 // --------------------
 // PATCH /user/profile (update name + mark isNew = false if true)
