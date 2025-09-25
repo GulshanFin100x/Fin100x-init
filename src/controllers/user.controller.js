@@ -369,7 +369,7 @@ export const chatWithBot = async (req, res) => {
 
     let response;
     try {
-      response = await axios.post("http://0.0.0.0:8000/query", payload, {
+      response = await axios.post("http://34.29.149.253:8000/query", payload, {
         headers: { "Content-Type": "application/json" },
         timeout: 30000,
       });
@@ -382,7 +382,7 @@ export const chatWithBot = async (req, res) => {
     }
 
     try {
-      return res.json(response.data);
+      return res.json({conversationId, botResponse : response.data});
     } catch (responseError) {
       console.error("Response sending error:", responseError);
       return res.status(500).json({ error: "Failed to send response" });

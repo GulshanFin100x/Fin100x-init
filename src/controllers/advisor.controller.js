@@ -205,7 +205,10 @@ export const getAllTags = async (req, res) => {
 
 export const bookCallWithAdvisor = async (req, res) => {
   try {
-    const { userId, advisorId, startTime, endTime } = req.body;
+
+    const userId = req.user.userId;
+
+    const { advisorId, startTime, endTime } = req.body;
 
     if (!userId || !advisorId || !startTime || !endTime) {
       return res
@@ -225,7 +228,7 @@ export const bookCallWithAdvisor = async (req, res) => {
     });
 
     if (!user.email || !advisor.email) {
-      return res.status(400).json({ error: "Invalid userId or advisorId" });
+      return res.status(400).json({ error: "Advisor or User Id mail is not " });
     }
 
     const userEmail = user.email;
