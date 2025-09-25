@@ -82,7 +82,9 @@ export const createAdvisor = async (req, res) => {
         yearsExperience: Number(yearsExperience) || 0,
         email,
         fees: Number(fees) || 0,
-        imageUrl,
+        imageUrl : imageUrl
+      ? await generateSignedUrl(imageUrl)
+      : null,
       },
     });
 
