@@ -29,7 +29,6 @@ export const createQuiz = async (req, res) => {
   }
 };
 
-
 export const createAdvisor = async (req, res) => {
   try {
     const {
@@ -57,12 +56,7 @@ export const createAdvisor = async (req, res) => {
 
     // if image uploaded via multipart/form-data
     if (req.file) {
-      // const file = bucket.file(
-      //   `advisor/${Date.now()}-${req.file.originalname}`
-      // );
-      const file = bucket.file(
-        `advisor/${req.file.originalname}`
-      );
+      const file = bucket.file(`advisor/${req.file.originalname}`);
       await file.save(req.file.buffer, {
         contentType: req.file.mimetype,
       });
@@ -82,19 +76,26 @@ export const createAdvisor = async (req, res) => {
         yearsExperience: Number(yearsExperience) || 0,
         email,
         fees: Number(fees) || 0,
-        imageUrl : imageUrl
-      ? await generateSignedUrl(imageUrl)
-      : null,
+        imageUrl,
       },
     });
 
-    res.status(201).json({ message: "Advisor created", advisor });
+    const signedUrl = advisor.imageUrl
+      ? await generateSignedUrl(advisor.imageUrl)
+      : null;
+
+    res.status(201).json({
+      message: "Advisor created",
+      advisor: {
+        ...advisor,
+        imageUrl: signedUrl, // return signed URL in API
+      },
+    });
   } catch (error) {
     console.error("Error creating advisor:", error);
     res.status(500).json({ error: "Failed to create advisor" });
   }
 };
-
 
 // ---------- UPDATE ADVISOR ----------
 export const updateAdvisor = async (req, res) => {
@@ -110,10 +111,8 @@ export const updateAdvisor = async (req, res) => {
       certificate,
       fees,
       email,
-      calenderId
+      calenderId,
     } = req.body;
-
-    console.log("Req body:", req.body);
 
     // Handle expertiseTags — can be sent as JSON string
     let parsedTags = [];
@@ -129,17 +128,12 @@ export const updateAdvisor = async (req, res) => {
 
     // If user sent a new image
     if (req.file) {
-      const file = bucket.file(`advisor/${Date.now()}-${req.file.originalname}`);
+      const file = bucket.file(`advisor/${req.file.originalname}`);
       await file.save(req.file.buffer, {
         contentType: req.file.mimetype,
       });
 
-      const [signedUrl] = await file.getSignedUrl({
-        action: "read",
-        version: "v4",
-        expires: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 days
-      });
-      imageUrl = signedUrl;
+      imageUrl = `advisor/${req.file.originalname}`;
     }
 
     const advisor = await prisma.advisor.update({
@@ -159,7 +153,17 @@ export const updateAdvisor = async (req, res) => {
       },
     });
 
-    res.status(200).json({ message: "Advisor updated successfully", advisor });
+    const signedUrl = advisor.imageUrl
+      ? await generateSignedUrl(advisor.imageUrl)
+      : null;
+
+    res.status(201).json({
+      message: "Advisor created",
+      advisor: {
+        ...advisor,
+        imageUrl: signedUrl, // return signed URL in API
+      },
+    });
   } catch (error) {
     console.error("Error updating advisor:", error);
     res.status(500).json({ error: "Failed to update advisor" });
@@ -226,7 +230,6 @@ export const getAdvisors = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch advisors" });
   }
 };
-
 
 // --------------------
 // GET /advisors/:id (fetch advisor details by ID)
@@ -305,7 +308,7 @@ export const getAdvisorById = async (req, res) => {
 };
 
 // --------------------
-// DELETE /advisors/:id (delete advisor by ID)  
+// DELETE /advisors/:id (delete advisor by ID)
 // --------------------
 export const deleteAdvisor = async (req, res) => {
   try {
@@ -329,7 +332,6 @@ export const deleteAdvisor = async (req, res) => {
     res.status(500).json({ error: "Failed to delete advisor" });
   }
 };
-
 
 // --------------------
 // CREATE GlossaryTerm
@@ -425,9 +427,3 @@ export const deleteGlossaryTerm = async (req, res) => {
     res.status(500).json({ error: "Failed to delete glossary term" });
   }
 };
-
-
-
-
-
-
