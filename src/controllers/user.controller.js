@@ -358,7 +358,6 @@ export const chatWithBot = async (req, res) => {
       });
     } catch (findError) {
       console.error("DB find session error:", findError);
-      return res.status(500).json({ error: "DB session lookup failed" });
     }
 
     if (!session) {
