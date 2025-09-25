@@ -215,5 +215,26 @@ model Meeting {
   user        User     @relation(fields: [userId], references: [id])
   advisor     Advisor  @relation(fields: [advisorId], references: [id])
 }
+
+model AgentSession {
+  session_id String   @id
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+  messages   AgentMessage[] // relation
+
+  @@map("agent_sessions")
+}
+model AgentMessage {
+  id           Int      @id @default(autoincrement())
+  session_id   String
+  message_data String
+  created_at   DateTime @default(now())
+
+  session      AgentSession @relation(fields: [session_id], references: [session_id], onDelete: Cascade)
+
+  @@index([session_id, created_at], name: "idx_agent_messages_session_time")
+  @@map("agent_messages")
+}
+
 //End of changes by Suyash
 

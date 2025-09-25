@@ -259,7 +259,7 @@ export const bookCallWithAdvisor = async (req, res) => {
 
 export const getAdvisorCalendarSchedule = async (req, res) => {
   try {
-    const { advisorId } = req.query;
+    const { advisorId } = req.params;
 
     if (!advisorId) {
       return res.status(400).json({ error: "Missing required advisorId" });

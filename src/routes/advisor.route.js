@@ -24,7 +24,7 @@ router.get("/tags", getAllTags);
 
 //Start of changes by Suyash
 router.post("/bookCall", bookCallWithAdvisor);
-router.get("/schedule", getAdvisorCalendarSchedule);
+router.get("/schedule/:advisorId", getAdvisorCalendarSchedule);
 //End of changes by Suyash
 
 

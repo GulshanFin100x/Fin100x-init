@@ -166,7 +166,7 @@ export const updateAdvisor = async (req, res) => {
     });
   } catch (error) {
     console.error("Error updating advisor:", error);
-    res.status(500).json({ error: "Failed to update advisor" });
+    res.status(500).json({ error: "Failed to update advisor"});
   }
 };
 

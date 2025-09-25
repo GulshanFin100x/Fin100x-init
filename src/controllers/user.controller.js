@@ -2,6 +2,7 @@ import prisma from "../lib/prisma.js";
 import { encrypt, decrypt } from "../utils/encryption.js";
 import axios from "axios";
 import { Storage } from "@google-cloud/storage";
+import { v4 as uuidv4 } from "uuid";
 
 // --------------------
 // Quiz Controller
@@ -202,119 +203,197 @@ export const messages = async (req, res) => {
 // --------------------
 // Chat with Bot
 // --------------------
+// export const chatWithBot = async (req, res) => {
+//   try {
+//     const { conversationId, query } = req.body;
+//     const userId = req.user.userId;
+
+//     if (!query) {
+//       return res.status(400).json({ error: "Query is required" });
+//     }
+
+//     let convId = conversationId;
+//     let convTitle = null;
+
+//     // Create conversation if new
+//     if (!convId || convId === "null") {
+//       const title = query.split(" ").slice(0, 5).join(" ");
+//       const newConversation = await prisma.conversation.create({
+//         data: { title, userId },
+//       });
+//       convId = newConversation.id;
+//       convTitle = newConversation.title;
+//     }
+
+//     // Fetch last 5 messages
+//     const lastMessages = await prisma.message.findMany({
+//       where: { conversationId: convId },
+//       orderBy: { createdAt: "desc" },
+//       take: 5,
+//       select: { message_query: true, message_response: true },
+//     });
+
+//     // Decrypt context
+//     const context = lastMessages
+//       .map((msg) => {
+//         const userMsg = msg.message_query
+//           ? decrypt(JSON.parse(msg.message_query))
+//           : null;
+//         const botMsg = msg.message_response
+//           ? decrypt(JSON.parse(msg.message_response))
+//           : null;
+//         return { query: userMsg, response: botMsg };
+//       })
+//       .reverse();
+
+//     // Payload for external API
+//     const apiPayload = {
+//       user_id: userId,
+//       conversation_id: convId,
+//       // messages: [...context, { role: "user", content: query }],
+//       messages: [{ role: "user", content: query }],
+//     };
+
+//     // // Prepare payload as per your Python API contract
+//     // const apiPayload = {
+//     //   user_input: query, // <-- here you send { user_input: "Example of SIP" } as required
+//     // };
+
+//     // const apiResponse = await axios.post(
+//     //   "https://your-external-api.com/chat",
+//     //   apiPayload,
+//     //   { headers: { Authorization: `Bearer ${process.env.EXTERNAL_API_KEY}` } }
+//     // );
+//     // const responseText = apiResponse.data.reply || "No response from API";
+
+//     let responseText = "No response from AI agent";
+
+//     try {
+//       // Call Python AI agent
+//       const response = await axios.post(
+//         process.env.PYTHON_AGENT_URL || "http://34.29.149.253:8000/chat",
+//         apiPayload,
+//         {
+//           headers: {
+//             Authorization: `Bearer ${process.env.PYTHON_AGENT_API_KEY}`,
+//             "Content-Type": "application/json",
+//             "X-User-ID": userId,
+//           },
+//           timeout: 30000,
+//         }
+//       );
+
+//       responseText = response.data?.response || responseText;
+//     } catch (error) {
+//       console.error("Error calling Python AI agent:", error.message);
+//     }
+
+//     // console.log(responseText);
+
+//     // Encrypt and save
+//     const encQuery = encrypt(query);
+//     const encResponse = encrypt(responseText);
+
+//     const message = await prisma.message.create({
+//       data: {
+//         message_query: JSON.stringify(encQuery),
+//         message_response: JSON.stringify(encResponse),
+//         is_bot: true,
+//         is_encrypted: true,
+//         conversation: { connect: { id: convId } },
+//         user: { connect: { id: userId } },
+//       },
+//     });
+
+//     res.json({
+//       conversationId: convId,
+//       conversationTitle: convTitle,
+//       messageId: message.id,
+//       botResponse: responseText,
+//     });
+//   } catch (err) {
+//     console.error("Error in chatWithBot:", err.message || err);
+//     res.status(500).json({ error: "Internal server error" });
+//   }
+// };
+
+//++Suyash
+
+
 export const chatWithBot = async (req, res) => {
   try {
-    const { conversationId, query } = req.body;
+    let { query, conversationId } = req.body;
+
     const userId = req.user.userId;
 
     if (!query) {
-      return res.status(400).json({ error: "Query is required" });
+      console.error("Missing required fields: query");
+      return res
+        .status(400)
+        .json({ error: "Missing required fields: query" });
     }
 
-    let convId = conversationId;
-    let convTitle = null;
+    if (!conversationId) {
+      conversationId = uuidv4();
+      console.log(`Generated new conversationId: ${conversationId}`);
+    }
 
-    // Create conversation if new
-    if (!convId || convId === "null") {
-      const title = query.split(" ").slice(0, 5).join(" ");
-      const newConversation = await prisma.conversation.create({
-        data: { title, userId },
+    const session_id = `${userId}_${conversationId}`;
+
+    let session;
+    try {
+      session = await prisma.agentSession.findUnique({
+        where: { session_id },
       });
-      convId = newConversation.id;
-      convTitle = newConversation.title;
+    } catch (findError) {
+      console.error("DB find session error:", findError);
+      return res.status(500).json({ error: "DB session lookup failed" });
     }
 
-    // Fetch last 5 messages
-    const lastMessages = await prisma.message.findMany({
-      where: { conversationId: convId },
-      orderBy: { createdAt: "desc" },
-      take: 5,
-      select: { message_query: true, message_response: true },
-    });
+    if (!session) {
+      try {
+        await prisma.agentSession.create({
+          data: { session_id },
+        });
+      } catch (createError) {
+        console.error("DB create session error:", createError);
+        return res.status(500).json({ error: "DB session creation failed" });
+      }
+    }
 
-    // Decrypt context
-    const context = lastMessages
-      .map((msg) => {
-        const userMsg = msg.message_query
-          ? decrypt(JSON.parse(msg.message_query))
-          : null;
-        const botMsg = msg.message_response
-          ? decrypt(JSON.parse(msg.message_response))
-          : null;
-        return { query: userMsg, response: botMsg };
-      })
-      .reverse();
-
-    // Payload for external API
-    const apiPayload = {
-      user_id: userId,
-      conversation_id: convId,
-      // messages: [...context, { role: "user", content: query }],
-      messages: [{ role: "user", content: query }],
+    const payload = {
+      query,
+      userId,
+      conversationId,
     };
 
-    // // Prepare payload as per your Python API contract
-    // const apiPayload = {
-    //   user_input: query, // <-- here you send { user_input: "Example of SIP" } as required
-    // };
-
-    // const apiResponse = await axios.post(
-    //   "https://your-external-api.com/chat",
-    //   apiPayload,
-    //   { headers: { Authorization: `Bearer ${process.env.EXTERNAL_API_KEY}` } }
-    // );
-    // const responseText = apiResponse.data.reply || "No response from API";
-
-    let responseText = "No response from AI agent";
-
+    let response;
     try {
-      // Call Python AI agent
-      const response = await axios.post(
-        process.env.PYTHON_AGENT_URL || "http://34.29.149.253:8000/chat",
-        apiPayload,
-        {
-          headers: {
-            Authorization: `Bearer ${process.env.PYTHON_AGENT_API_KEY}`,
-            "Content-Type": "application/json",
-            "X-User-ID": userId,
-          },
-          timeout: 30000,
-        }
-      );
-
-      responseText = response.data?.response || responseText;
-    } catch (error) {
-      console.error("Error calling Python AI agent:", error.message);
+      response = await axios.post("http://0.0.0.0:8000/query", payload, {
+        headers: { "Content-Type": "application/json" },
+        timeout: 30000,
+      });
+    } catch (mcpError) {
+      console.error("MCP server call error:", mcpError.message || mcpError);
+      if (mcpError.response?.data?.response) {
+        return res.json({ response: mcpError.response.data.response });
+      }
+      return res.status(502).json({ error: "Failed to connect to MCP server" });
     }
 
-    // console.log(responseText);
-
-    // Encrypt and save
-    const encQuery = encrypt(query);
-    const encResponse = encrypt(responseText);
-
-    const message = await prisma.message.create({
-      data: {
-        message_query: JSON.stringify(encQuery),
-        message_response: JSON.stringify(encResponse),
-        is_bot: true,
-        is_encrypted: true,
-        conversation: { connect: { id: convId } },
-        user: { connect: { id: userId } },
-      },
-    });
-
-    res.json({
-      conversationId: convId,
-      conversationTitle: convTitle,
-      messageId: message.id,
-      botResponse: responseText,
-    });
+    try {
+      return res.json(response.data);
+    } catch (responseError) {
+      console.error("Response sending error:", responseError);
+      return res.status(500).json({ error: "Failed to send response" });
+    }
   } catch (err) {
-    console.error("Error in chatWithBot:", err.message || err);
-    res.status(500).json({ error: "Internal server error" });
+    console.error("Internal server error in chatWithBot:", err);
+    return res.status(500).json({ error: "Internal server error" });
   }
 };
+
+//++Suyash
 
 
 // --------------------
