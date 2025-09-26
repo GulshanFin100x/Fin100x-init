@@ -344,13 +344,6 @@ export const chatWithBot = async (req, res) => {
       convTitle = newConversation.title;
     }
 
-    // if (!conversationId) {
-    //   conversationId = uuidv4();
-    //   console.log(`Generated new conversationId: ${conversationId}`);
-    // }
-
-    // const session_id = `${userId}_${conversationId}`;
-
     const session_id = `${userId}_${convId}`;
 
     let session;
@@ -376,7 +369,7 @@ export const chatWithBot = async (req, res) => {
     const payload = {
       query,
       userId,
-      conversationId,
+      conversationId : convId,
     };
 
     let responseText = "No response from AI agent";
