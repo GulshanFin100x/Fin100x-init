@@ -416,15 +416,6 @@ export const chatWithBot = async (req, res) => {
 
 
 // --------------------
-// Google Cloud Storage Config
-// --------------------
-
-const storage = new Storage({
-  projectId: process.env.GCP_PROJECT_ID,
-  keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-});
-
-// --------------------
 // PATCH /user/profile (update name + mark isNew = false if true)
 // --------------------
 export async function updateUserProfile(req, res) {

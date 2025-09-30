@@ -24,8 +24,6 @@ export async function protectRoute(req, res, next) {
     return res.status(401).json({ code: "SESSION_REVOKED" });
   }
 
-  // console.log("protectRoute:", decoded);
-
   req.user = { userId: decoded.userId };
   next();
 }

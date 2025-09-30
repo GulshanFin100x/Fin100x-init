@@ -9,6 +9,7 @@ import authRoutes from "./routes/auth.route.js";
 import bannerRoutes from "./routes/banner.route.js";
 import youtubeRoutes from "./routes/youtube.route.js";
 import meetingRoutes from "./routes/meeting.route.js";
+import financialRoutes from "./routes/financial.route.js";
 
 const app = express();
 const PORT = process.env.PORT;
@@ -28,6 +29,7 @@ app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/banner", bannerRoutes);
 app.use("/api/v1/youtube", youtubeRoutes);
 app.use("/api/v1/meeting", meetingRoutes);
+app.use("/api/v1/financial", financialRoutes);
 
 
 

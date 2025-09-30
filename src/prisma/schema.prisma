@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -12,98 +9,81 @@ datasource db {
 
 model Advisor {
   id              String    @id @default(uuid())
-  imageUrl        String
   salutation      String
   firstName       String
   lastName        String
   designation     String
-  yearsExperience Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
   expertiseTags   String[]
+  yearsExperience Int       @default(0)
   certificate     String
-  fees            Float     @default(0)   // in INR
-  email           String    @unique  //++ Suyash
-  calendarId      String   @default("primary") //++ Suyash
-  // Relations
-  reviews         Review[]   // one advisor can have many reviews
-  meetings     Meeting[]    //++ Suyash
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  fees            Float     @default(0)
+  imageUrl        String
+  email           String    @unique
+  calendarId      String    @default("primary")
+  meetings        Meeting[]
+  reviews         Review[]
 }
 
 model Review {
   id        String   @id @default(uuid())
   rating    Float
   comment   String?
-
-  // Foreign keys
   advisorId String
   userId    String
-
-  // Relations
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
   advisor   Advisor  @relation(fields: [advisorId], references: [id])
   user      User     @relation(fields: [userId], references: [id])
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([advisorId, userId])  // ✅ ensures 1 review per user per advisor
+  @@unique([advisorId, userId])
 }
 
 model User {
-  id           String    @id @default(uuid())
-  phone        String    @unique
-  phoneMasked  String
-  name         String?
-  language     String    @default("en-IN")
-  referralCode String?
-  isNew        Boolean   @default(true)
-  kycStatus    KycStatus @default(none)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  id              String         @id @default(uuid())
+  isNew           Boolean        @default(true)
+  kycStatus       KycStatus      @default(none)
+  language        String         @default("en-IN")
+  name            String?
+  phone           String         @unique
+  phoneMasked     String
+  referralCode    String?
   lastQuizTakenAt DateTime?
-  totalQuizzes    Int           @default(0) 
-  redeemPoints    Int           @default(0) 
-
-  email           String? @unique
-
-  session      Session?
-  conversations Conversation[]
-  messages      Message[]
-  reviews       Review[]
-  assets        UserAsset?    
-
-  meetings     Meeting[]    //++ Suyash
-
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-}
-
-enum KycStatus {
-  none
-  pending
-  verified
+  redeemPoints    Int            @default(0)
+  totalQuizzes    Int            @default(0)
+  email           String?        @unique
+  conversations   Conversation[]
+  meetings        Meeting[]
+  messages        Message[]
+  reviews         Review[]
+  session         Session?
+  assets          UserAsset?
+  financialData   FinancialData[]
 }
 
 model UserAsset {
-  id          String   @id @default(uuid())
-  userId      String   @unique
-  user        User     @relation(fields: [userId], references: [id])
-
-  income      Float    @default(0)
-  expenses    Float    @default(0)
-  savings     Float    @default(0)
-  netWorth    Float    @default(0)
-  cashFlow    Float    @default(0)
-  loans       Float    @default(0)
-  insurance   Float    @default(0)
-  taxSavings  Float    @default(0)
-
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id         String   @id @default(uuid())
+  userId     String   @unique
+  income     Float    @default(0)
+  expenses   Float    @default(0)
+  savings    Float    @default(0)
+  netWorth   Float    @default(0)
+  cashFlow   Float    @default(0)
+  loans      Float    @default(0)
+  insurance  Float    @default(0)
+  taxSavings Float    @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  user       User     @relation(fields: [userId], references: [id])
 }
 
 model OTPRequest {
-  id        String   @id                  // requestId, e.g., "req_xxx"
+  id        String   @id
   phone     String
-  otpHash   String                         // bcrypt hash of OTP
+  otpHash   String
   deviceId  String?
   channel   String   @default("sms")
   locale    String   @default("en-IN")
@@ -114,127 +94,139 @@ model OTPRequest {
 
 model Session {
   id               String   @id @default(cuid())
-  userId           String   @unique           // single active session per user
+  userId           String   @unique
   refreshTokenHash String
   deviceId         String?
   revoked          Boolean  @default(false)
   expiresAt        DateTime
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Conversation {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   title     String
-  userId    String   // ✅ FK to User
+  createdAt DateTime  @default(now())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   messages  Message[]
-  createdAt DateTime @default(now())
-
-  // Relations
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Message {
-  id               String   @id @default(uuid())
+  id               String       @id @default(uuid())
   conversationId   String
-  userId           String   // ✅ FK to User
   message_query    String
   message_response String
-  is_bot           Boolean  @default(false)
-  is_encrypted     Boolean  @default(false)
-  createdAt        DateTime @default(now())
-
-  // Relations
-  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  is_bot           Boolean      @default(false)
+  is_encrypted     Boolean      @default(false)
+  createdAt        DateTime     @default(now())
+  userId           String
+  conversation     Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user             User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Quiz {
   id        Int        @id @default(autoincrement())
   title     String
-  questions Question[]
   createdAt DateTime   @default(now())
+  questions Question[]
 }
 
 model Question {
   id        Int      @id @default(autoincrement())
   quizId    Int
-  quiz      Quiz     @relation(fields: [quizId], references: [id])
-
   text      String
   optionA   String
   optionB   String
   optionC   String
   optionD   String
-  correct   String   // store the correct answer as string (e.g. "optionC")
-
+  correct   String
   createdAt DateTime @default(now())
+  quiz      Quiz     @relation(fields: [quizId], references: [id])
 }
-
 
 model Banner {
   id          String   @id @default(uuid())
   title       String
-  imageUrl    String   // store fileName like "banner1.png"
-  redirectUrl String   // e.g. "https://paytm.com/upi-offer"
-  screen      String   // e.g. "home", "quiz", "advisor"
+  imageUrl    String
+  redirectUrl String
+  screen      String
   validFrom   DateTime @default(now())
   validTill   DateTime
   isActive    Boolean  @default(true)
-
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
-
 
 model GlossaryTerm {
-  id          String   @id @default(uuid())
-  tag         String   // e.g., "nifty", "roi"
-  word        String   // e.g., "50", "Diversification"
-  definition  String   // explanation of the word
-
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id         String   @id @default(uuid())
+  tag        String
+  word       String
+  definition String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }
 
-//Start of changes by Suyash
 model Meeting {
-  id          Int      @id @default(autoincrement())
-  userId      String
-  advisorId   String
-  meetLink    String
-  eventId     String   // Optional Google event ID
-  startTime   DateTime
-  endTime     DateTime
-  conferenceRecordId String? // Add this for Google Meet Conference Record
-  transcript      String?
-  createdAt   DateTime @default(now())
-
-  user        User     @relation(fields: [userId], references: [id])
-  advisor     Advisor  @relation(fields: [advisorId], references: [id])
+  id                 Int      @id @default(autoincrement())
+  userId             String
+  advisorId          String
+  meetLink           String
+  eventId            String
+  startTime          DateTime
+  endTime            DateTime
+  conferenceRecordId String?
+  transcript         String?
+  createdAt          DateTime @default(now())
+  advisor            Advisor  @relation(fields: [advisorId], references: [id])
+  user               User     @relation(fields: [userId], references: [id])
 }
 
 model AgentSession {
-  session_id String   @id
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
-  messages   AgentMessage[] // relation
+  session_id String         @id @db.VarChar
+  created_at DateTime       @default(now()) @db.Timestamp(6)
+  updated_at DateTime       @default(now()) @db.Timestamp(6)
+  messages   AgentMessage[]
 
   @@map("agent_sessions")
 }
+
 model AgentMessage {
-  id           Int      @id @default(autoincrement())
-  session_id   String
+  id           Int          @id @default(autoincrement())
+  session_id   String       @db.VarChar
   message_data String
-  created_at   DateTime @default(now())
+  created_at   DateTime     @default(now()) @db.Timestamp(6)
+  session      AgentSession @relation(fields: [session_id], references: [session_id], onDelete: Cascade, onUpdate: NoAction)
 
-  session      AgentSession @relation(fields: [session_id], references: [session_id], onDelete: Cascade)
-
-  @@index([session_id, created_at], name: "idx_agent_messages_session_time")
+  @@index([session_id, created_at], map: "idx_agent_messages_session_time")
   @@map("agent_messages")
 }
 
-//End of changes by Suyash
+enum KycStatus {
+  none
+  pending
+  verified
+}
 
+model FinancialData {
+  id                   Int      @id @default(autoincrement())
+  userId               String   @unique
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+ monthlySavings       Int      @default(0)
+  sipInvestments       Int      @default(0)
+  totalAssets          Int      @default(0)
+  totalLoans           Int      @default(0)
+  monthlyEmi           Int      @default(0)
+  creditCardOutstanding Int     @default(0)
+  insuranceCoverage    Int      @default(0)
+  taxSavings           Int      @default(0)
+  retirementFund       Int      @default(0)
+  monthlyIncome        Int      @default(0)
+  monthlyExpenses      Int      @default(0)
+  savingsRatio         Float     @default(0)
+  score                Int?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}

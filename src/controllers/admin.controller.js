@@ -29,6 +29,9 @@ export const createQuiz = async (req, res) => {
   }
 };
 
+// --------------------
+// POST /advisors (create new advisor)
+// --------------------
 export const createAdvisor = async (req, res) => {
   try {
     const {
@@ -46,7 +49,7 @@ export const createAdvisor = async (req, res) => {
     let parsedTags = [];
     if (expertiseTags) {
       try {
-        parsedTags = JSON.parse(expertiseTags); // ✅ parse string to array
+        parsedTags = JSON.parse(expertiseTags);
       } catch {
         parsedTags = [];
       }
@@ -56,12 +59,13 @@ export const createAdvisor = async (req, res) => {
 
     // if image uploaded via multipart/form-data
     if (req.file) {
-      const file = bucket.file(`advisor/${req.file.originalname}`);
+      const newFileName = `advisor/${Date.now()}-${req.file.originalname}`;
+      const file = bucket.file(newFileName);
       await file.save(req.file.buffer, {
         contentType: req.file.mimetype,
       });
 
-      imageUrl = `advisor/${req.file.originalname}`;
+      imageUrl = newFileName;
     }
 
     const advisor = await prisma.advisor.create({
@@ -97,7 +101,9 @@ export const createAdvisor = async (req, res) => {
   }
 };
 
-// ---------- UPDATE ADVISOR ----------
+// --------------------
+// PATCH /advisors/:id (update advisor details)
+// --------------------
 export const updateAdvisor = async (req, res) => {
   try {
     const { id } = req.params;
@@ -128,12 +134,13 @@ export const updateAdvisor = async (req, res) => {
 
     // If user sent a new image
     if (req.file) {
-      const file = bucket.file(`advisor/${req.file.originalname}`);
+      const newFileName = `advisor/${Date.now()}-${req.file.originalname}`;
+      const file = bucket.file(newFileName);
       await file.save(req.file.buffer, {
         contentType: req.file.mimetype,
       });
 
-      imageUrl = `advisor/${req.file.originalname}`;
+      imageUrl = newFileName;
     }
 
     const advisor = await prisma.advisor.update({
@@ -158,7 +165,7 @@ export const updateAdvisor = async (req, res) => {
       : null;
 
     res.status(201).json({
-      message: "Advisor created",
+      message: "Advisor Updated",
       advisor: {
         ...advisor,
         imageUrl: signedUrl, // return signed URL in API
@@ -427,3 +434,172 @@ export const deleteGlossaryTerm = async (req, res) => {
     res.status(500).json({ error: "Failed to delete glossary term" });
   }
 };
+
+// --------------------
+// GET All Banners (paginated)
+// --------------------
+export const getBanners = async (req, res) => {
+  try {
+    // pagination params
+    let { page = 1, limit = 10 } = req.query;
+    page = parseInt(page);
+    limit = parseInt(limit);
+    const skip = (page - 1) * limit;
+
+    // get total count for pagination metadata
+    const totalCount = await prisma.banner.count();
+
+    // fetch paginated banners
+    const banners = await prisma.banner.findMany({
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: limit,
+    });
+
+    // Replace fileName with signed URL
+    const bannersWithUrls = await Promise.all(
+      banners.map(async (banner) => {
+        const signedUrl = await generateSignedUrl(banner.imageUrl);
+        return { ...banner, imageUrl: signedUrl };
+      })
+    );
+
+    res.json({
+      data: bannersWithUrls,
+      pagination: {
+        total: totalCount,
+        page,
+        limit,
+        totalPages: Math.ceil(totalCount / limit),
+        hasNextPage: page * limit < totalCount,
+        hasPrevPage: page > 1,
+      },
+    });
+  } catch (err) {
+    console.error("Error fetching banners:", err);
+    res.status(500).json({ error: "Failed to fetch banners" });
+  }
+};
+
+// --------------------
+// CREATE Banner
+// --------------------
+export const createBanner = async (req, res) => {
+  try {
+    const { title, redirectUrl, screen, validFrom, validTill, isActive } =
+      req.body;
+
+    let imageUrl = null;
+
+    // if image uploaded via multipart/form-data
+    if (req.file) {
+      const newFileName = `banner/${Date.now()}-${req.file.originalname}`;
+      const file = bucket.file(newFileName);
+      await file.save(req.file.buffer, {
+        contentType: req.file.mimetype,
+      });
+
+      console.log("Uploaded file to GCP:", file.name);
+
+      imageUrl = newFileName;
+    }
+
+    const banner = await prisma.banner.create({
+      data: {
+        title,
+        redirectUrl,
+        screen,
+        validFrom: validFrom ? new Date(validFrom) : new Date(),
+        validTill: validTill ? new Date(validTill) : new Date(),
+        isActive: isActive !== undefined ? isActive === "true" : true,
+        imageUrl,
+      },
+    });
+
+    // generate signed URL for response
+    const signedUrl = banner.imageUrl
+      ? await generateSignedUrl(banner.imageUrl)
+      : null;
+
+    res.status(201).json({
+      message: "Banner created successfully",
+      banner: {
+        ...banner,
+        imageUrl: signedUrl,
+      },
+    });
+  } catch (error) {
+    console.error("Error creating banner:", error);
+    res.status(500).json({ error: "Failed to create banner" });
+  }
+};
+
+// --------------------
+// UPDATE Banner
+// --------------------
+export const updateBanner = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      title,
+      redirectUrl,
+      screen,
+      validFrom,
+      validTill,
+      isActive,
+    } = req.body;
+
+    // find banner first
+    const existingBanner = await prisma.banner.findUnique({ where: { id } });
+    if (!existingBanner) {
+      return res.status(404).json({ error: "Banner not found" });
+    }
+
+    let imageUrl = existingBanner.imageUrl;
+
+    // if new image uploaded, overwrite old
+    if (req.file) {
+      const newFileName = `banner/${Date.now()}-${req.file.originalname}`;
+      const file = bucket.file(newFileName);
+
+      await file.save(req.file.buffer, {
+        contentType: req.file.mimetype,
+      });
+
+      imageUrl = newFileName;
+    }
+
+    const updatedBanner = await prisma.banner.update({
+      where: { id },
+      data: {
+        ...(title && { title }),
+        ...(redirectUrl && { redirectUrl }),
+        ...(screen && { screen }),
+        ...(validFrom && { validFrom: new Date(validFrom) }),
+        ...(validTill && { validTill: new Date(validTill) }),
+        ...(typeof isActive !== "undefined" && {
+          isActive: isActive === "true" || isActive === true,
+        }),
+        imageUrl,
+      },
+    });
+
+    // generate signed URL for response
+    const signedUrl = updatedBanner.imageUrl
+      ? await generateSignedUrl(updatedBanner.imageUrl)
+      : null;
+
+    res.json({
+      message: "Banner updated successfully",
+      banner: {
+        ...updatedBanner,
+        imageUrl: signedUrl,
+      },
+    });
+  } catch (error) {
+    console.error("Error updating banner:", error);
+    res.status(500).json({ error: "Failed to update banner" });
+  }
+};
+
+
