@@ -44,6 +44,7 @@ model User {
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
   id              String         @id @default(uuid())
+  imageUrl       String?
   isNew           Boolean        @default(true)
   kycStatus       KycStatus      @default(none)
   language        String         @default("en-IN")
@@ -211,7 +212,7 @@ enum KycStatus {
 
 model FinancialData {
   id                   Int      @id @default(autoincrement())
-  userId               String   @unique
+  userId               String   
   user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
  monthlySavings       Int      @default(0)

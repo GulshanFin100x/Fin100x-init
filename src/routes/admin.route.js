@@ -42,5 +42,4 @@ router.patch("/banners/:id", upload.single("image"), updateBanner);
 
 
 
-
 export default router;

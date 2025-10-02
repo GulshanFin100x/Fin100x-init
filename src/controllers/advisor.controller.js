@@ -89,12 +89,38 @@ export const getAdvisors = async (req, res) => {
 
 export const reviews = async (req, res) => {
   try {
-    const { advisorId, userId, rating, comment } = req.body;
+    const userId = req.user.userId;
+    const { advisorId, rating, comment } = req.body;
 
-    if (!advisorId || !userId || !rating) {
+    // 1. Initial Check for required presence (null/undefined)
+    // NOTE: 'comment' is now treated as required based on your request.
+    if (!advisorId || !userId || !rating || !comment) {
       return res
         .status(400)
-        .json({ error: "advisorId, userId, rating are required" });
+        .json({
+          error: "advisorId, userId, rating, and comment are required fields",
+        });
+    }
+
+    // 2. Value Range and Type Checks
+
+    // Validate rating range
+    if (rating && (rating < 1 || rating > 5)) {
+      return res.status(400).json({ error: "Rating must be between 1 and 5" });
+    }
+
+    // New Validation: Check that advisorId is not just an empty string or whitespace
+    if (typeof advisorId === "string" && advisorId.trim() === "") {
+      return res
+        .status(400)
+        .json({ error: "advisorId cannot be empty or just whitespace" });
+    }
+
+    // New Validation: Check that comment is not just an empty string or whitespace
+    if (typeof comment === "string" && comment.trim() === "") {
+      return res
+        .status(400)
+        .json({ error: "Comment cannot be empty or just whitespace" });
     }
 
     // ✅ create review
@@ -117,6 +143,10 @@ export const reviews = async (req, res) => {
 export const advisorReview = async (req, res) => {
     try {
         const { advisorId } = req.params;
+
+      if (!advisorId) {
+        return res.status(400).json({ error: "Missing required advisorId" });
+      }
         const page = parseInt(req.query.page, 10) || 1;
         const limit = parseInt(req.query.limit, 10) || 5;
 
@@ -130,7 +160,7 @@ export const advisorReview = async (req, res) => {
                 orderBy: { createdAt: "desc" },
                 include: {
                     user: {
-                        select: { id: true, firstName: true, lastName: true },
+                        select: { id: true, name: true, imageUrl: true },
                     },
                 },
             }),
@@ -152,25 +182,25 @@ export const advisorReview = async (req, res) => {
     }
 };
 
-export const advisorRating = async (req, res) => {
-    try {
-        const { advisorId } = req.params;
+// export const advisorRating = async (req, res) => {
+//     try {
+//         const { advisorId } = req.params;
 
-        const stats = await prisma.review.aggregate({
-            where: { advisorId },
-            _avg: { rating: true },
-            _count: { rating: true },
-        });
+//         const stats = await prisma.review.aggregate({
+//             where: { advisorId },
+//             _avg: { rating: true },
+//             _count: { rating: true },
+//         });
 
-        res.json({
-            avgRating: stats._avg.rating || 0,
-            totalReviews: stats._count.rating,
-        });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: "Failed to fetch rating" });
-    }
-};
+//         res.json({
+//             avgRating: stats._avg.rating || 0,
+//             totalReviews: stats._count.rating,
+//         });
+//     } catch (err) {
+//         console.error(err);
+//         res.status(500).json({ error: "Failed to fetch rating" });
+//     }
+// };
 
 
 // --------------------

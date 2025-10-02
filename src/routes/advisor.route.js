@@ -3,7 +3,7 @@ import { protectRoute } from "../middleware/auth.middleware.js";
 import {
   reviews,
   advisorReview,
-  advisorRating,
+  // advisorRating,
   getAdvisors,
   getAllTags,
   bookCallWithAdvisor, //++ Suyash
@@ -12,14 +12,15 @@ import {
 
 const router = express.Router();
 
-router.get("/", getAdvisors);                                   //pagination should be implemented;                        
-router.post("/reviews", reviews);                              //User posts review
-router.get("/reviews/:advisorId", advisorReview);             //Get all reviews of an advisor with pagination
-router.get("/:advisorId/rating", advisorRating);              //Get average rating of an advisor
+router.get("/", getAdvisors);                      //pagination should be iplemented;                        
+// router.get("/:advisorId/rating", advisorRating);              //Get average rating of an advisor
 router.get("/tags", getAllTags);  
 
 
 router.use(protectRoute);
+
+router.post("/reviews", reviews);                              //User posts review
+router.get("/reviews/:advisorId", advisorReview);             //Get all reviews of an advisor with pagination
 
 
 //Start of changes by Suyash
