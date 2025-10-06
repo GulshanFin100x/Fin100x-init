@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import prisma from "../lib/prisma.js";
+import crypto from "crypto"; 
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const REFRESH_SECRET = process.env.REFRESH_SECRET;
@@ -31,31 +32,31 @@ const createTokens = (admin) => {
 };
 
 // --------------------
-// SIGNUP (Admin)
+// SIGNUP (Admin)   only needed to create the first admin
 // --------------------
-export const signupAdmin = async (req, res) => {
-  try {
-    const { email, password, name } = req.body;
+// export const signupAdmin = async (req, res) => {
+//   try {
+//     const { email, password, name } = req.body;
 
-    const existing = await prisma.admin.findUnique({ where: { email } });
-    if (existing)
-      return res.status(400).json({ error: "Email already exists" });
+//     const existing = await prisma.admin.findUnique({ where: { email } });
+//     if (existing)
+//       return res.status(400).json({ error: "Email already exists" });
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+//     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const admin = await prisma.admin.create({
-      data: { email, password: hashedPassword, name },
-    });
+//     const admin = await prisma.admin.create({
+//       data: { email, password: hashedPassword, name },
+//     });
 
-    res.status(201).json({
-      message: "Admin registered",
-      admin: { id: admin.id, email: admin.email },
-    });
-  } catch (error) {
-    console.error("Signup error:", error);
-    res.status(500).json({ error: "Failed to register admin" });
-  }
-};
+//     res.status(201).json({
+//       message: "Admin registered",
+//       admin: { id: admin.id, email: admin.email },
+//     });
+//   } catch (error) {
+//     console.error("Signup error:", error);
+//     res.status(500).json({ error: "Failed to register admin" });
+//   }
+// };
 
 // --------------------
 // LOGIN (Admin)
