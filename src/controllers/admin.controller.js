@@ -1,34 +1,6 @@
 import prisma from "../lib/prisma.js";
 import { bucket, generateSignedUrl } from "../utils/gcp.js";
 
-export const createQuiz = async (req, res) => {
-  try {
-    const { title, questions } = req.body;
-
-    if (!title) {
-      return res.status(400).json({ error: "Quiz title is required" });
-    }
-
-    const quiz = await prisma.quiz.create({
-      data: {
-        title,
-        questions: {
-          create: questions || [],
-        },
-      },
-      include: { questions: true },
-    });
-
-    res.status(201).json({
-      message: "Quiz created successfully",
-      quiz,
-    });
-  } catch (err) {
-    console.error("Error creating quiz:", err);
-    res.status(500).json({ error: "Failed to create quiz" });
-  }
-};
-
 // --------------------
 // POST /advisors (create new advisor)
 // --------------------
@@ -130,10 +102,27 @@ export const updateAdvisor = async (req, res) => {
       }
     }
 
+    // Fetch current advisor (to get old imageUrl if it exists)
+    const existingAdvisor = await prisma.advisor.findUnique({
+      where: { id },
+    });
+
     let imageUrl;
 
     // If user sent a new image
     if (req.file) {
+      // ---- Delete old image from GCP ----
+      if (existingAdvisor?.imageUrl) {
+        try {
+          const oldFile = bucket.file(existingAdvisor.imageUrl);
+          await oldFile.delete();
+          console.log("Old image deleted from GCP:", existingAdvisor.imageUrl);
+        } catch (err) {
+          console.warn("Failed to delete old image:", err.message);
+        }
+      }
+
+      // ---- Upload new image ----
       const newFileName = `advisor/${Date.now()}-${req.file.originalname}`;
       const file = bucket.file(newFileName);
       await file.save(req.file.buffer, {
@@ -143,6 +132,7 @@ export const updateAdvisor = async (req, res) => {
       imageUrl = newFileName;
     }
 
+    // ---- Update advisor in DB ----
     const advisor = await prisma.advisor.update({
       where: { id },
       data: {
@@ -160,6 +150,7 @@ export const updateAdvisor = async (req, res) => {
       },
     });
 
+    // ---- Generate signed URL for frontend ----
     const signedUrl = advisor.imageUrl
       ? await generateSignedUrl(advisor.imageUrl)
       : null;
@@ -173,9 +164,10 @@ export const updateAdvisor = async (req, res) => {
     });
   } catch (error) {
     console.error("Error updating advisor:", error);
-    res.status(500).json({ error: "Failed to update advisor"});
+    res.status(500).json({ error: "Failed to update advisor" });
   }
 };
+
 
 // --------------------
 // GET /advisors (fetch paginated advisors with avg rating & review count)
@@ -557,8 +549,20 @@ export const updateBanner = async (req, res) => {
 
     let imageUrl = existingBanner.imageUrl;
 
-    // if new image uploaded, overwrite old
+    // if new image uploaded, delete old one first then upload new
     if (req.file) {
+      // ---- Delete old image from GCP ----
+      if (existingBanner.imageUrl) {
+        try {
+          const oldFile = bucket.file(existingBanner.imageUrl);
+          await oldFile.delete();
+          console.log("Old banner image deleted from GCP:", existingBanner.imageUrl);
+        } catch (err) {
+          console.warn("Failed to delete old banner image:", err.message);
+        }
+      }
+
+      // ---- Upload new image ----
       const newFileName = `banner/${Date.now()}-${req.file.originalname}`;
       const file = bucket.file(newFileName);
 
@@ -569,6 +573,7 @@ export const updateBanner = async (req, res) => {
       imageUrl = newFileName;
     }
 
+    // ---- Update DB ----
     const updatedBanner = await prisma.banner.update({
       where: { id },
       data: {
@@ -584,7 +589,7 @@ export const updateBanner = async (req, res) => {
       },
     });
 
-    // generate signed URL for response
+    // ---- Generate signed URL for response ----
     const signedUrl = updatedBanner.imageUrl
       ? await generateSignedUrl(updatedBanner.imageUrl)
       : null;
@@ -599,6 +604,213 @@ export const updateBanner = async (req, res) => {
   } catch (error) {
     console.error("Error updating banner:", error);
     res.status(500).json({ error: "Failed to update banner" });
+  }
+};
+
+// --------------------
+// CREATE Quiz
+// --------------------
+export const createQuiz = async (req, res) => {
+  try {
+    const { title, questions } = req.body;
+
+    if (!title || !questions || !Array.isArray(questions)) {
+      return res
+        .status(400)
+        .json({ error: "Title and questions are required" });
+    }
+
+    const quiz = await prisma.quiz.create({
+      data: {
+        title,
+        questions: {
+          create: questions.map((q) => ({
+            text: q.text,
+            optionA: q.optionA,
+            optionB: q.optionB,
+            optionC: q.optionC,
+            optionD: q.optionD,
+            correct: q.correct,
+          })),
+        },
+      },
+      include: { questions: true },
+    });
+
+    res.status(201).json({ message: "Quiz created", quiz });
+  } catch (error) {
+    console.error("Error creating quiz:", error);
+    res.status(500).json({ error: "Failed to create quiz" });
+  }
+};
+
+// --------------------
+// UPDATE Quiz
+// --------------------
+export const updateQuiz = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, questions } = req.body;
+
+    // Check quiz exists
+    const existing = await prisma.quiz.findUnique({
+      where: { id: Number(id) },
+    });
+    if (!existing) return res.status(404).json({ error: "Quiz not found" });
+
+    // Update quiz + replace questions if provided
+    const updatedQuiz = await prisma.quiz.update({
+      where: { id: Number(id) },
+      data: {
+        ...(title && { title }),
+        ...(questions && {
+          questions: {
+            deleteMany: {}, // clear existing questions
+            create: questions.map((q) => ({
+              text: q.text,
+              optionA: q.optionA,
+              optionB: q.optionB,
+              optionC: q.optionC,
+              optionD: q.optionD,
+              correct: q.correct,
+            })),
+          },
+        }),
+      },
+      include: { questions: true },
+    });
+
+    res.json({ message: "Quiz updated", quiz: updatedQuiz });
+  } catch (error) {
+    console.error("Error updating quiz:", error);
+    res.status(500).json({ error: "Failed to update quiz" });
+  }
+};
+
+// --------------------
+// DELETE Quiz
+// --------------------
+export const deleteQuiz = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Delete quiz + cascade questions
+    await prisma.question.deleteMany({ where: { quizId: Number(id) } });
+    await prisma.quiz.delete({ where: { id: Number(id) } });
+
+    res.json({ message: "Quiz deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting quiz:", error);
+    res.status(500).json({ error: "Failed to delete quiz" });
+  }
+};
+
+// --------------------
+// GET Quiz by ID
+// --------------------
+export const getQuizById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const quiz = await prisma.quiz.findUnique({
+      where: { id: Number(id) },
+      include: { questions: true },
+    });
+
+    if (!quiz) return res.status(404).json({ error: "Quiz not found" });
+
+    res.json(quiz);
+  } catch (error) {
+    console.error("Error fetching quiz:", error);
+    res.status(500).json({ error: "Failed to fetch quiz" });
+  }
+};
+
+// --------------------
+// LIST Quizzes (with pagination)
+// --------------------
+export const listQuizzes = async (req, res) => {
+  try {
+    const { page = 1, limit = 10 } = req.query;
+
+    const skip = (Number(page) - 1) * Number(limit);
+    const take = Number(limit);
+
+    const [quizzes, total] = await Promise.all([
+      prisma.quiz.findMany({
+        skip,
+        take,
+        orderBy: { createdAt: "desc" },
+        include: { questions: true },
+      }),
+      prisma.quiz.count(),
+    ]);
+
+    res.json({
+      total,
+      page: Number(page),
+      pages: Math.ceil(total / take),
+      quizzes,
+    });
+  } catch (error) {
+    console.error("Error listing quizzes:", error);
+    res.status(500).json({ error: "Failed to list quizzes" });
+  }
+};
+
+// --------------------
+// LIST all meetings with pagination
+// --------------------
+export const listMeetings = async (req, res) => {
+  try {
+    const { page = 1, limit = 10 } = req.query;
+
+    const skip = (Number(page) - 1) * Number(limit);
+    const take = Number(limit);
+
+    // Fetch meetings with pagination
+    const [meetings, total] = await Promise.all([
+      prisma.meeting.findMany({
+        skip,
+        take,
+        orderBy: { createdAt: "desc" },
+        include: {
+          user: { select: { id: true, name: true } },
+          advisor: {
+            select: {
+              id: true,
+              salutation: true,
+              firstName: true,
+              lastName: true,
+            },
+          },
+        },
+      }),
+      prisma.meeting.count(),
+    ]);
+
+    // Format response
+    const formatted = meetings.map((m) => ({
+      meetingId: m.id,
+      userId: m.userId,
+      userName: m.user?.name || "N/A",
+      advisorId: m.advisorId,
+      advisorName: `${m.advisor.salutation} ${m.advisor.firstName} ${m.advisor.lastName}`,
+      meetLink: m.meetLink,
+      startTime: m.startTime,
+      endTime: m.endTime,
+      createdAt: m.createdAt,
+    }));
+
+    res.json({
+      message: "Meetings fetched successfully",
+      total,
+      page: Number(page),
+      pages: Math.ceil(total / take),
+      meetings: formatted,
+    });
+  } catch (error) {
+    console.error("Error fetching meetings:", error);
+    res.status(500).json({ error: "Failed to fetch meetings" });
   }
 };
 

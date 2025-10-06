@@ -1,6 +1,5 @@
 import express from "express";
 import {
-  createQuiz,
   createAdvisor,
   updateAdvisor,
   getAdvisors,
@@ -13,6 +12,12 @@ import {
   getBanners,
   createBanner,
   updateBanner,
+  createQuiz,
+  updateQuiz,
+  deleteQuiz,   
+  getQuizById,
+  listQuizzes,
+  listMeetings,
 } from "../controllers/admin.controller.js";
 
 import multer from "multer";
@@ -40,6 +45,14 @@ router.get("/banners", getBanners);
 router.post("/banners", upload.single("image"), createBanner);                      //Admin adds banner
 router.patch("/banners/:id", upload.single("image"), updateBanner);
 
+//quiz APIs
+router.post("/quiz", createQuiz);
+router.put("/quiz/:id", updateQuiz);
+router.delete("/quiz/:id", deleteQuiz);
+router.get("/quiz/:id", getQuizById);
+router.get("/quiz", listQuizzes);
 
+//meeting APIs
+router.get("/meetings", listMeetings);
 
 export default router;

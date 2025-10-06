@@ -10,6 +10,7 @@ import bannerRoutes from "./routes/banner.route.js";
 import youtubeRoutes from "./routes/youtube.route.js";
 import meetingRoutes from "./routes/meeting.route.js";
 import financialRoutes from "./routes/financial.route.js";
+import authAdminRoutes from "./routes/authAdmin.route.js";
 
 const app = express();
 const PORT = process.env.PORT;
@@ -25,6 +26,7 @@ app.use(express.json());
 app.use("/api/v1/user", userRoutes);
 app.use("/api/v1/advisor", advisorRoutes);
 app.use("/api/v1/admin", adminRoutes);
+app.use("/api/v1/authAdmin", authAdminRoutes);
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/banner", bannerRoutes);
 app.use("/api/v1/youtube", youtubeRoutes);
