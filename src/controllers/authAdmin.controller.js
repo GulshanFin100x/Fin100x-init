@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import prisma from "../lib/prisma.js";
-import crypto from "crypto"; 
+import crypto from "crypto";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const REFRESH_SECRET = process.env.REFRESH_SECRET;
@@ -9,7 +9,7 @@ const REFRESH_SECRET = process.env.REFRESH_SECRET;
 // Helper function to create new tokens
 const createTokens = (admin) => {
   // 1. Access token (15m)
-  
+
   const accessToken = jwt.sign(
     {
       adminId: admin.id,
@@ -71,7 +71,7 @@ export const loginAdmin = async (req, res) => {
     const valid = await bcrypt.compare(password, admin.password);
     if (!valid) return res.status(400).json({ error: "Invalid credentials" });
 
-    const { accessToken, refreshToken, refreshExpiresAt } = createTokens(admin); 
+    const { accessToken, refreshToken, refreshExpiresAt } = createTokens(admin);
 
     // Enforce single active refresh token: delete any previous tokens for this admin
     await prisma.refreshToken.deleteMany({
@@ -95,7 +95,7 @@ export const loginAdmin = async (req, res) => {
 };
 
 // --------------------
-// REFRESH TOKEN 
+// REFRESH TOKEN
 // --------------------
 export const refreshToken = async (req, res) => {
   try {
@@ -133,13 +133,13 @@ export const refreshToken = async (req, res) => {
       }
 
       // 1. Revoke the old refresh token
-      await prisma.refreshToken.delete({ where: { token: oldRefreshToken } }); 
+      await prisma.refreshToken.delete({ where: { token: oldRefreshToken } });
 
       // 2. Create new tokens
       const {
         accessToken: newAccessToken,
-        refreshToken: newRefreshToken, 
-        refreshExpiresAt: newRefreshExpiresAt, 
+        refreshToken: newRefreshToken,
+        refreshExpiresAt: newRefreshExpiresAt,
       } = createTokens(admin);
 
       // 3. Save the new refresh token in DB
@@ -164,7 +164,12 @@ export const refreshToken = async (req, res) => {
 // --------------------
 export const logoutAdmin = async (req, res) => {
   try {
-    const { refreshToken, accessToken } = req.body;
+    const authHeader = req.headers["authorization"] || "";
+    const accessToken = authHeader.startsWith("Bearer ")
+      ? authHeader.slice(7)
+      : null;
+
+    const { refreshToken } = req.body;
     if (!refreshToken)
       return res.status(400).json({ error: "Refresh token required" });
     if (!accessToken)
