@@ -32,14 +32,12 @@ export const getQuiz = async (req, res) => {
       canTakeQuiz = lastTaken < today;
     }
 
-    // ❌ If not eligible, block immediately
     if (!canTakeQuiz) {
       return res.status(403).json({
         message: "You have already taken the quiz today. Come back tomorrow!",
       });
     }
 
-    // ✅ Get latest quiz only if eligible
     const latestQuiz = await prisma.quiz.findFirst({
       orderBy: { createdAt: "desc" },
       include: { questions: true },

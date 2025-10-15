@@ -5,8 +5,6 @@ import { fetchMeetingTranscriptComplete } from "../utils/googleCalendar.js";
 export const getUpcomingMeetingsForUser = async (req, res) => {
   try {
     
-    const userId = req.query.userId;
-
     const now = new Date();
 
     // Fetch all upcoming meetings for the user
