@@ -12,12 +12,16 @@ import {
   submitQuiz,
   getGlossaryTerms,
   getGlossaryTags,
+  listSections,
+  getRulesBySection,
 } from "../controllers/user.controller.js";
 
 const router = express.Router();
 
 router.get("/glossary", getGlossaryTerms);
 router.get("/glossary/tags", getGlossaryTags);
+routes.get("/moneyrules/sections", listSections);
+routes.get("/moneyrules/sections/:id/rules", getRulesBySection);
 
 router.use(protectRoute);
 

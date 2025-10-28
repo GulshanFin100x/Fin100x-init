@@ -2,6 +2,7 @@ import prisma from "../lib/prisma.js";
 import { encrypt, decrypt } from "../utils/encryption.js";
 import axios from "axios";
 import { Storage } from "@google-cloud/storage";
+import { start } from "repl";
 
 // --------------------
 // Quiz Controller
@@ -641,5 +642,95 @@ export const getGlossaryTags = async (req, res) => {
   } catch (err) {
     console.error("Error fetching glossary tags:", err);
     res.status(500).json({ error: "Failed to fetch glossary tags" });
+  }
+};
+
+
+// --------------------
+// GET /moneyrules/sections
+// Returns all sections with metadata only (no rules)
+// --------------------
+export const listSections = async (req, res) => {
+  try {
+    const sections = await prisma.findMany({
+      orderBy: { startRule: 'asc' },
+      select: {
+        id: true,
+        name: true,
+        startRule: true,
+        endRule: true,
+        createAt: true,
+        updateAt: true
+      }
+    });
+    return res.status(200).json({
+      success: true,
+      message: "Sections fetched successfully",
+      data: sections
+    });
+  } catch (error) {
+    console.error("Error fetching sections:", error);
+    return res.status(500).json({ error: "Failed to fetch sections" });
+  }
+};
+
+
+// --------------------
+// GET /moneyrules/sections/:id/rules
+// Returns all rules for a given section ID
+// --------------------
+
+export const getRulesBySection = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const sectionId = parseInt(id);
+
+    if (isNaN(sectionId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid section ID",
+      });
+    }
+
+    // Fetch section with rules
+    const section = await prisma.section.findUnique({
+      where: { id: sectionId },
+      include: {
+        rules: {
+          orderBy: { number: "asc" },
+          select: {
+            id: true,
+            number: true,
+            title : true,
+            definition: true,
+            whyItMatters: true,
+            howToApply: true,
+            example: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
+      },
+    });
+
+    if (!section) {
+      return res.status(404).json({
+        success: false,
+        message: "Section not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Rules fetched successfully",
+      data: section,
+    });
+  } catch (error) {
+    console.error("Error fetching rules by section:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch rules",
+      error: error.message,
+    });
   }
 };

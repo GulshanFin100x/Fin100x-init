@@ -258,3 +258,30 @@ model BlacklistedToken {
   expiresAt DateTime  
   createdAt DateTime  @default(now())
 }
+
+
+model Section {
+  id          Int      @id @default(autoincrement())
+  name        String
+  startRule   Int       
+  endRule     Int          
+  rules       Rule[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Rule {
+  id           Int      @id @default(autoincrement())
+  sectionId    Int
+  section      Section  @relation(fields: [sectionId], references: [id])
+  number       Int      
+  title        String 
+  definition   String
+  whyItMatters String
+  howToApply   String
+  example      String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([sectionId, number])
+}
