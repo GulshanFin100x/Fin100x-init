@@ -687,6 +687,7 @@ export const updateQuiz = async (req, res) => {
   }
 };
 
+
 // --------------------
 // DELETE Quiz
 // --------------------
