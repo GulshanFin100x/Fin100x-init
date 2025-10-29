@@ -652,15 +652,15 @@ export const getGlossaryTags = async (req, res) => {
 // --------------------
 export const listSections = async (req, res) => {
   try {
-    const sections = await prisma.findMany({
+    const sections = await prisma.section.findMany({
       orderBy: { startRule: 'asc' },
       select: {
         id: true,
         name: true,
         startRule: true,
         endRule: true,
-        createAt: true,
-        updateAt: true
+        createdAt: true,
+        updatedAt: true
       }
     });
     return res.status(200).json({
@@ -706,6 +706,7 @@ export const getRulesBySection = async (req, res) => {
             whyItMatters: true,
             howToApply: true,
             example: true,
+            impact : true,
             createdAt: true,
             updatedAt: true,
           },
