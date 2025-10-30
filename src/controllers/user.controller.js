@@ -373,7 +373,7 @@ export const chatWithBot = async (req, res) => {
 
     let responseText = "No response from AI agent";
     try {
-      const response = await axios.post("http://34.29.149.253:8000/query", payload, {
+      const response = await axios.post("http://34.58.160.112:8000/query", payload, {
         headers: { "Content-Type": "application/json" },
         timeout: 60000,
       });
