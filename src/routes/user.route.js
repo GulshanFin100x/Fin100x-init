@@ -23,6 +23,12 @@ router.get("/glossary/tags", getGlossaryTags);
 router.get("/moneyrules/sections", listSections);
 router.get("/moneyrules/sections/:id/rules", getRulesBySection);
 
+router.get("/enableAllFeatures", (req, res) => {
+  res.json({
+    status: false,
+  });
+});
+
 router.use(protectRoute);
 
 router.get("/conversations", conversations);
