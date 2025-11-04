@@ -1,5 +1,7 @@
 // src/controllers/auth.controller.js
 import prisma from "../lib/prisma.js";
+import twilio from "twilio";
+
 import {
   generateNumericOTP,
   hashOtp,
@@ -15,8 +17,13 @@ import {
   verifyRefreshToken,
 } from "../utils/crypto.js";
 
-const SANDBOX = String(process.env.SANDBOX_MODE || "true") === "true";
 const REFRESH_TTL_DAYS = parseInt(process.env.REFRESH_TTL_DAYS || "30", 10);
+
+// Twilio Client
+const client = twilio(
+  process.env.TWILIO_ACCOUNT_SID,
+  process.env.TWILIO_AUTH_TOKEN
+);
 
 // Helper to revoke existing session(s) for user (soft revoke)
 async function revokeExistingSession(userId) {
@@ -45,8 +52,29 @@ export async function requestOtp(req, res) {
     }
 
     const requestId = "req_" + Math.random().toString(36).slice(2, 12);
-    const otp = SANDBOX ? "123456" : generateNumericOTP(6);
+    const otp = generateNumericOTP(6);
     const otpHash = await hashOtp(otp);
+
+    // Prepare SMS Body
+    const smsBody = `Your OTP for Fin100x.ai is ${otp}. It is valid for 3 minutes. Do not share it with anyone.`;
+
+    // ---- Send SMS (Twilio) ----
+    try {
+      await client.messages.create({
+        body: smsBody,
+        from: process.env.TWILIO_PHONE_NUMBER, // example: "+1XXXXXXXXXX"
+        to: phone,
+      });
+    } catch (smsError) {
+      console.error("Twilio SMS Error:", smsError);
+
+      return res.status(500).json({
+        code: "SMS_FAILED",
+        message: "Failed to send OTP SMS. Try again.",
+      });
+    }
+
+    // Only save OTP in DB if SMS sending was successful
 
     await prisma.OTPRequest.create({
       data: {
