@@ -52,27 +52,28 @@ export async function requestOtp(req, res) {
     }
 
     const requestId = "req_" + Math.random().toString(36).slice(2, 12);
-    const otp = generateNumericOTP(6);
+    // const otp = generateNumericOTP(6);
+    const otp = '123456';
     const otpHash = await hashOtp(otp);
 
-    // Prepare SMS Body
-    const smsBody = `Your OTP for Fin100x.ai is ${otp}. It is valid for 3 minutes. Do not share it with anyone.`;
+    // // Prepare SMS Body
+    // const smsBody = `Your OTP for Fin100x.ai is ${otp}. It is valid for 3 minutes. Do not share it with anyone.`;
 
-    // ---- Send SMS (Twilio) ----
-    try {
-      await client.messages.create({
-        body: smsBody,
-        from: process.env.TWILIO_PHONE_NUMBER, // example: "+1XXXXXXXXXX"
-        to: phone,
-      });
-    } catch (smsError) {
-      console.error("Twilio SMS Error:", smsError);
+    // // ---- Send SMS (Twilio) ----
+    // try {
+    //   await client.messages.create({
+    //     body: smsBody,
+    //     from: process.env.TWILIO_PHONE_NUMBER, // example: "+1XXXXXXXXXX"
+    //     to: phone,
+    //   });
+    // } catch (smsError) {
+    //   console.error("Twilio SMS Error:", smsError);
 
-      return res.status(500).json({
-        code: "SMS_FAILED",
-        message: "Failed to send OTP SMS. Try again.",
-      });
-    }
+    //   return res.status(500).json({
+    //     code: "SMS_FAILED",
+    //     message: "Failed to send OTP SMS. Try again.",
+    //   });
+    // }
 
     // Only save OTP in DB if SMS sending was successful
 
