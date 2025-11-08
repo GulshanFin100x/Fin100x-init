@@ -25,7 +25,7 @@ router.get("/moneyrules/sections/:id/rules", getRulesBySection);
 
 router.get("/enableAllFeatures", (req, res) => {
   res.json({
-    status: false,
+    status: true,
   });
 });
 
