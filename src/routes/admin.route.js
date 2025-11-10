@@ -1,4 +1,7 @@
 import express from "express";
+
+import { protectRoute } from "../middleware/authAdmin.middleware.js";
+
 import {
   createAdvisor,
   updateAdvisor,
@@ -25,7 +28,7 @@ import multer from "multer";
 const router = express.Router();
 const upload = multer();             // memory storage for GCP upload
 
-
+router.use(protectRoute);
 
 //advisor APIs
 router.post("/advisors", upload.single("image"), createAdvisor);               //Admin adds advisor

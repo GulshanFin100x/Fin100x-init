@@ -2,7 +2,7 @@ import jwt from "jsonwebtoken";
 import prisma from "../lib/prisma.js"; // ➕ ADDED: Import prisma to access the DB
 const ACCESS_SECRET = process.env.JWT_SECRET || "access_secret";
 
-export const authenticateAdmin = (req, res, next) => {
+export const protectRoute = (req, res, next) => {
   const authHeader = req.headers["authorization"];
   const token = authHeader && authHeader.split(" ")[1];
 
