@@ -1,5 +1,6 @@
 // src/controllers/auth.controller.js
 import prisma from "../lib/prisma.js";
+import axios from "axios";
 import twilio from "twilio";
 
 import {
@@ -19,11 +20,6 @@ import {
 
 const REFRESH_TTL_DAYS = parseInt(process.env.REFRESH_TTL_DAYS || "30", 10);
 
-// Twilio Client
-const client = twilio(
-  process.env.TWILIO_ACCOUNT_SID,
-  process.env.TWILIO_AUTH_TOKEN
-);
 
 // Helper to revoke existing session(s) for user (soft revoke)
 async function revokeExistingSession(userId) {
@@ -34,10 +30,19 @@ async function revokeExistingSession(userId) {
 }
 
 // 1) Request OTP
+const PINNACLE_URL =
+  process.env.PINNACLE_URL ||
+  "https://transapi.pinnacle.in/genericapi/JSONGenericReceiver";
+const PINNACLE_ACCESS_KEY = process.env.PINNACLE_ACCESS_KEY;
+const SMS_HEADER = process.env.SMS_HEADER; // e.g. "FinAI"
+const DLT_ENTITY_ID = process.env.DLT_ENTITY_ID;
+const DLT_TEMPLATE_ID = process.env.DLT_TEMPLATE_ID;
+
 export async function requestOtp(req, res) {
   try {
     const { phone, channel, locale, consent, deviceId } = req.body || {};
-    // Validate phone number
+
+    // Validate phone number: expect +91XXXXXXXXXX
     const phoneRegex = /^\+91[6-9]\d{9}$/;
     if (!phone || !phoneRegex.test(phone)) {
       return res
@@ -51,32 +56,92 @@ export async function requestOtp(req, res) {
         .json({ code: "CONSENT_MISSING", message: "Consent missing" });
     }
 
+    // Ensure provider env vars exist
+    if (
+      !PINNACLE_ACCESS_KEY ||
+      !SMS_HEADER ||
+      !DLT_ENTITY_ID ||
+      !DLT_TEMPLATE_ID
+    ) {
+      console.error(
+        "Missing SMS provider env vars. Required: PINNACLE_ACCESS_KEY, SMS_HEADER, DLT_ENTITY_ID, DLT_TEMPLATE_ID"
+      );
+      return res
+        .status(500)
+        .json({ code: "CONFIG_ERROR", message: "SMS provider not configured" });
+    }
+
     const requestId = "req_" + Math.random().toString(36).slice(2, 12);
-    // const otp = generateNumericOTP(6);
-    const otp = '123456';
+    const otp = generateNumericOTP(6);
     const otpHash = await hashOtp(otp);
 
-    // // Prepare SMS Body
-    // const smsBody = `Your OTP for Fin100x.ai is ${otp}. It is valid for 3 minutes. Do not share it with anyone.`;
+    // Prepare dest: remove +91 prefix and send only the 10 digits
+    // Input was validated to be +91XXXXXXXXXX so safe to slice
+    const destNumber = phone.startsWith("+91")
+      ? phone.slice(3)
+      : phone.replace(/\D/g, "");
+    if (destNumber.length !== 10) {
+      return res
+        .status(400)
+        .json({
+          code: "INVALID_PHONE_FORMAT",
+          message: "Phone must be 10 digits after +91",
+        });
+    }
 
-    // // ---- Send SMS (Twilio) ----
-    // try {
-    //   await client.messages.create({
-    //     body: smsBody,
-    //     from: process.env.TWILIO_PHONE_NUMBER, // example: "+1XXXXXXXXXX"
-    //     to: phone,
-    //   });
-    // } catch (smsError) {
-    //   console.error("Twilio SMS Error:", smsError);
+    // Build provider body
+    const smsBody = `The OTP for Fin100x.ai is ${otp}`; // or format according to DLT template
+    const providerPayload = {
+      version: "1.0",
+      accesskey: PINNACLE_ACCESS_KEY,
+      messages: [
+        {
+          dest: [destNumber],
+          msg: smsBody,
+          type: "PM", // keep as required by provider
+          header: SMS_HEADER,
+          app_country: "1",
+          country_cd: "91",
+          dlt_entity_id: DLT_ENTITY_ID,
+          dlt_template_id: DLT_TEMPLATE_ID,
+        },
+      ],
+    };
 
-    //   return res.status(500).json({
-    //     code: "SMS_FAILED",
-    //     message: "Failed to send OTP SMS. Try again.",
-    //   });
-    // }
+    // Call Pinnacle API
+    let providerResponse;
+    try {
+      providerResponse = await axios.post(PINNACLE_URL, providerPayload, {
+        headers: { "Content-Type": "application/json" },
+        timeout: 10_000, // 10s timeout - adjust if needed
+      });
+    } catch (err) {
+      console.error(
+        "SMS provider call failed:",
+        err?.response?.data ?? err.message
+      );
+      return res.status(502).json({
+        code: "SMS_PROVIDER_ERROR",
+        message: "Failed to send OTP via SMS provider",
+        details: err?.response?.data ?? err.message,
+      });
+    }
+
+    // Basic success check: treat HTTP 2xx as success; optionally inspect providerResponse.data
+    if (!(providerResponse?.status >= 200 && providerResponse.status < 300)) {
+      console.error("SMS provider returned non-2xx:", providerResponse?.data);
+      return res.status(502).json({
+        code: "SMS_PROVIDER_REJECTED",
+        message: "SMS provider rejected the request",
+        details: providerResponse?.data,
+      });
+    }
+
+    // Optionally: inspect providerResponse.data to ensure provider accepted the message.
+    // e.g., if provider returns { status: 'SUCCESS' } style responses, check it here.
+    // For now we proceed if we got a 2xx response.
 
     // Only save OTP in DB if SMS sending was successful
-
     await prisma.OTPRequest.create({
       data: {
         id: requestId,
@@ -95,6 +160,11 @@ export async function requestOtp(req, res) {
       resendAfter: 30,
       maskedPhone: maskPhone(phone),
       deliveryChannel: channel || "sms",
+      providerResponse: {
+        // include minimal provider info for debugging (safe to return)
+        status: providerResponse.status,
+        data: providerResponse.data,
+      },
     });
   } catch (e) {
     console.error("requestOtp:", e);
