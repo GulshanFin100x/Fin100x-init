@@ -11,6 +11,8 @@ import youtubeRoutes from "./routes/youtube.route.js";
 import meetingRoutes from "./routes/meeting.route.js";
 import financialRoutes from "./routes/financial.route.js";
 import authAdminRoutes from "./routes/authAdmin.route.js";
+import loanProviderRoutes from "./routes/loanProvider.route.js";
+import providerFormRoutes from "./routes/providerForm.route.js";
 
 const app = express();
 const PORT = process.env.PORT;
@@ -32,6 +34,8 @@ app.use("/api/v1/banner", bannerRoutes);
 app.use("/api/v1/youtube", youtubeRoutes);
 app.use("/api/v1/meeting", meetingRoutes);
 app.use("/api/v1/financial", financialRoutes);
+app.use("/api/v1/loanProvider", loanProviderRoutes);
+app.use("/api/v1/providerForm", providerFormRoutes);
 
 
 

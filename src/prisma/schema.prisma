@@ -63,6 +63,8 @@ model User {
   session         Session?
   assets          UserAsset?
   financialData   FinancialData[]
+
+  loanApplications LoanApplication[]
 }
 
 model UserAsset {
@@ -285,4 +287,305 @@ model Rule {
   updatedAt    DateTime  @updatedAt
 
   @@unique([sectionId, number])
+}
+
+
+
+// New added schema for Credit and Loans 
+
+// ===== Enums (unchanged) =====
+enum LoanCategory {
+  PERSONAL_LOAN
+  HOME_LOAN
+  AUTO_LOAN
+  BUSINESS_LOAN
+  EDUCATION_LOAN
+  GOLD_LOAN
+  CREDIT_CARD
+  OTHER
+}
+
+enum AuthType {
+  OAUTH2
+  API_KEY
+  BEARER_TOKEN
+  BASIC_AUTH
+  CUSTOM
+}
+
+enum ApplicationStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  ADDITIONAL_INFO_REQUIRED
+  APPROVED
+  REJECTED
+  DISBURSED
+  CLOSED
+  CANCELLED
+}
+
+enum TransactionType {
+  DISBURSEMENT
+  EMI_PAYMENT
+  PREPAYMENT
+  LATE_FEE
+  PROCESSING_FEE
+  OTHER_CHARGE
+}
+
+// ===== Models (fixed relations + defaults for arrays) =====
+
+model LoanProvider {
+  id                    String    @id @default(uuid())
+  name                  String    @unique
+  displayName           String
+  code                  String    @unique
+  category              LoanCategory
+  logoUrl               String?
+  description           String?
+
+  // API Configuration
+  apiBaseUrl            String
+  apiVersion            String    @default("v1")
+  authType              AuthType
+  authConfig            Json
+
+  // Provider-specific settings
+  maxLoanAmount         Float?
+  minLoanAmount         Float?
+  minCreditScore        Int?
+  supportedTenures      Int[]     @default([])    // default empty array
+  interestRateRange     String?
+  processingFee         Float?
+
+  // Feature flags
+  isActive              Boolean   @default(true)
+  supportsInstantApproval Boolean @default(false)
+  supportsEmi           Boolean   @default(true)
+  supportsTopup         Boolean   @default(false)
+  requiresKyc           Boolean   @default(true)
+
+  // Rate limiting
+  rateLimit             Int       @default(100)
+  timeout               Int       @default(30000)
+
+  // Webhook configuration
+  webhookUrl            String?
+  webhookSecret         String?
+  webhookEvents         String[]   @default([])    // default empty array
+
+  // Priority and ranking
+  priority              Int       @default(0)
+
+  metadata              Json?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime? @updatedAt
+
+   providerForm     ProviderForm?
+
+  // Relations (no explicit @relation on the list side)
+  fieldMappings         ProviderFieldMapping[]
+  applications          LoanApplication[]
+  apiLogs               ProviderApiLog[]
+  webhookLogs           ProviderWebhookLog[]
+
+  @@index([category])
+  @@index([isActive])
+  @@index([priority])
+}
+
+model ProviderFieldMapping {
+  id             String   @id @default(uuid())
+  providerId     String
+  internalField  String
+  providerField  String
+  fieldType      String
+  transformRule  Json?    // JSON defining transformations
+  isRequired     Boolean  @default(false)
+  defaultValue   String?
+  validationRule Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // referencing side: onDelete cascade set here
+  provider       LoanProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, internalField])
+  @@index([providerId])
+}
+
+model LoanApplication {
+  id                    String     @id @default(uuid())
+  userId                String
+  providerId            String
+  applicationNumber     String     @unique
+  providerApplicationId String?
+  loanType              LoanCategory
+  loanAmount            Float
+  tenure                Int
+  interestRate          Float?
+  monthlyEmi            Float?
+  processingFee         Float?
+
+  status                ApplicationStatus @default(DRAFT)
+  statusMessage         String?
+  subStatus             String?
+
+  applicantData         Json
+  providerRequestData   Json?
+  providerResponseData  Json?
+
+  submittedAt           DateTime?
+  approvedAt            DateTime?
+  disbursedAt           DateTime?
+  rejectedAt            DateTime?
+
+  lastSyncedAt          DateTime?
+  syncAttempts          Int       @default(0)
+  syncErrors            Json?
+  metadata              Json?
+  tags                  String[]  @default([])   // default empty array
+
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime? @updatedAt
+
+  // referencing side: provider and user fields with onDelete where required
+  provider              LoanProvider   @relation(fields: [providerId], references: [id])
+  user                  User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  documents             ApplicationDocument[]
+  statusHistory         ApplicationStatusHistory[]
+  transactions          LoanTransaction[]
+  apiLogs               ProviderApiLog[]
+  webhookLogs           ProviderWebhookLog[]
+
+  @@index([userId, status])
+  @@index([providerId, status])
+  @@index([applicationNumber])
+  @@index([providerId])
+}
+
+model ApplicationDocument {
+  id                 String   @id @default(uuid())
+  applicationId      String
+  documentType       String
+  documentName       String
+  documentUrl        String
+  fileSize           Int?
+  mimeType           String?
+  uploadedToProvider Boolean  @default(false)
+  providerDocumentId  String?
+  isVerified         Boolean  @default(false)
+  verifiedAt         DateTime?
+  verificationData   Json?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime? @updatedAt
+
+  application        LoanApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId, documentType])
+  @@index([applicationId])
+}
+
+model ApplicationStatusHistory {
+  id                String            @id @default(uuid())
+  applicationId     String
+  fromStatus        ApplicationStatus
+  toStatus          ApplicationStatus
+  statusMessage     String?
+  changedBy         String?
+  providerResponse  Json?
+  createdAt         DateTime          @default(now())
+
+  application       LoanApplication   @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId, createdAt])
+  @@index([applicationId])
+}
+
+model LoanTransaction {
+  id              String      @id @default(uuid())
+  applicationId   String
+  transactionType TransactionType
+  amount          Float
+  transactionDate DateTime
+  dueDate         DateTime?
+  status          String
+  providerTxnId   String?
+  providerResponse Json?
+  description     String?
+  metadata        Json?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime?   @updatedAt
+
+  application     LoanApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId, transactionDate])
+  @@index([applicationId])
+  @@index([status])
+}
+
+model ProviderApiLog {
+  id              String   @id @default(uuid())
+  providerId      String
+  applicationId   String?
+  endpoint        String
+  method          String
+  requestHeaders  Json?
+  requestBody     Json?
+  responseStatus  Int?
+  responseBody    Json?
+  responseTime    Int?
+  success         Boolean
+  errorMessage    String?
+  createdAt       DateTime @default(now())
+
+  provider        LoanProvider   @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  application     LoanApplication? @relation(fields: [applicationId], references: [id])
+
+  @@index([providerId, createdAt])
+  @@index([applicationId, createdAt])
+  @@index([providerId])
+}
+
+model ProviderWebhookLog {
+  id              String   @id @default(uuid())
+  providerId      String
+  event           String
+  payload         Json
+  headers         Json?
+  processed       Boolean  @default(false)
+  processedAt     DateTime?
+  processingError String?
+  applicationId   String?
+  createdAt       DateTime @default(now())
+
+  provider        LoanProvider    @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  application     LoanApplication? @relation(fields: [applicationId], references: [id])
+
+  @@index([providerId, createdAt])
+  @@index([applicationId])
+  @@index([processed])
+  @@index([providerId])
+}
+
+
+
+/// ProviderForm: stores UI form config for a LoanProvider (one-to-one)
+model ProviderForm {
+  id            String   @id @default(uuid())
+  providerId    String   @unique
+  formId        String   // e.g. "loan-application-v1" or "user-registration"
+  title         String?
+  description   String?
+  fields        Json     // array of field objects (your UI shape)
+  submitButton  Json?    // optional { text, loadingText, ... }
+  metadata      Json?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  provider      LoanProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([providerId])
 }
