@@ -1,6 +1,6 @@
 import prisma from "../lib/prisma.js";
 
-const Joi = require("joi");
+import Joi from "joi";
 
 
 // ---------- Validation Schemas ----------
@@ -26,7 +26,7 @@ const updateSchema = Joi.object({
 // ---------- Controllers ----------
 
 // Create ProviderForm for a given providerId
-// POST /api/providers/:providerId/forms
+
 export const createProviderForm = async (req, res) => {
   try {
     const body = { ...req.body, providerId: req.params.providerId };
@@ -70,24 +70,34 @@ export const createProviderForm = async (req, res) => {
 }
 
 // Get list of forms for a provider with optional pagination and search on formId/title
-// GET /api/providers/:providerId/forms?page=1&limit=20&search=registration
+
+// controllers/providerForm.controller.js
+
 export const listProviderForms = async (req, res) => {
   try {
-    const { providerId } = req.params;
+    // optional route param
+    const providerId = req.params.providerId || null;
+
+    // pagination only used for the "list all" case
     const { page = 1, limit = 20, search } = req.query;
-    const take = Math.min(parseInt(limit, 10) || 20, 100);
-    const skip = (Math.max(parseInt(page, 10) || 1, 1) - 1) * take;
+    const pageNum = Math.max(parseInt(page, 10) || 1, 1);
+    const take = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 100);
+    const skip = (pageNum - 1) * take;
 
-    // Ensure provider exists
-    const provider = await prisma.loanProvider.findUnique({
-      where: { id: providerId },
-    });
-    if (!provider)
-      return res
-        .status(404)
-        .json({ success: false, error: "LoanProvider not found" });
+    // If providerId provided -> fetch single form by providerId (unique)
+    if (providerId) {
+      const form = await prisma.providerForm.findUnique({
+        where: { providerId },
+      });
 
-    const where = { providerId };
+      if (!form) {
+        return res.status(404).json({ success: false, error: "ProviderForm not found for this provider" });
+      }
+      return res.json({ success: true, data: form });
+    }
+
+    // No providerId -> list all forms (paginated). Allow optional search.
+    const where = {};
     if (search) {
       where.OR = [
         { formId: { contains: search, mode: "insensitive" } },
@@ -100,7 +110,7 @@ export const listProviderForms = async (req, res) => {
         where,
         skip,
         take,
-        orderBy: { createdAt: "desc" },
+        orderBy: { createdAt: 'desc' },
       }),
       prisma.providerForm.count({ where }),
     ]);
@@ -108,18 +118,17 @@ export const listProviderForms = async (req, res) => {
     return res.json({
       success: true,
       data: items,
-      meta: { total, page: parseInt(page, 10), limit: take },
+      meta: { total, page: pageNum, limit: take },
     });
   } catch (err) {
     console.error("listProviderForms error:", err);
-    return res
-      .status(500)
-      .json({ success: false, error: "Internal server error" });
+    return res.status(500).json({ success: false, error: "Internal server error" });
   }
-}
+};
+
 
 // Get a single ProviderForm by id (ensure it belongs to providerId)
-// GET /api/providers/:providerId/forms/:id
+
 export const getProviderFormById = async (req, res) => {
   try {
     const { providerId, id } = req.params;
@@ -141,46 +150,60 @@ export const getProviderFormById = async (req, res) => {
 }
 
 // Update ProviderForm (partial)
-// PATCH /api/providers/:providerId/forms/:id
-export const  updateProviderForm = async (req, res)  => {
+
+export const updateProviderForm = async (req, res) => {
   try {
-    const { providerId, id } = req.params;
+    const providerId = req.params.providerId; // provider's id from route
+    if (!providerId) {
+      return res
+        .status(400)
+        .json({ success: false, error: "providerId param is required" });
+    }
+
     const { error, value } = updateSchema.validate(req.body, {
       stripUnknown: true,
     });
-    if (error)
+    if (error) {
       return res
         .status(400)
         .json({ success: false, error: error.details.map((d) => d.message) });
+    }
 
-    const form = await prisma.providerForm.findUnique({ where: { id } });
-    if (!form || form.providerId !== providerId)
+    // find existing form by providerId (providerId is unique in ProviderForm)
+    const form = await prisma.providerForm.findUnique({
+      where: { providerId },
+    });
+    if (!form) {
       return res
         .status(404)
         .json({
           success: false,
           error: "ProviderForm not found for this provider",
         });
-
-    // If formId changed, ensure uniqueness per provider
-    if (value.formId && value.formId !== form.formId) {
-      const exists = await prisma.providerForm.findFirst({
-        where: { providerId, formId: value.formId },
-      });
-      if (exists)
-        return res
-          .status(409)
-          .json({
-            success: false,
-            error:
-              "Another form with this formId already exists for the provider",
-          });
     }
 
+    // If changing formId, ensure no other providerForm (other provider) already uses that formId
+    if (value.formId && value.formId !== form.formId) {
+      const conflict = await prisma.providerForm.findFirst({
+        where: {
+          formId: value.formId,
+          NOT: { providerId }, // exclude current provider's form
+        },
+      });
+      if (conflict) {
+        return res.status(409).json({
+          success: false,
+          error: "Another provider already uses this formId",
+        });
+      }
+    }
+
+    // Perform update by providerId (providerId is unique so this is valid)
     const updated = await prisma.providerForm.update({
-      where: { id },
+      where: { providerId },
       data: value,
     });
+
     return res.json({ success: true, data: updated });
   } catch (err) {
     console.error("updateProviderForm error:", err);
@@ -188,21 +211,35 @@ export const  updateProviderForm = async (req, res)  => {
       .status(500)
       .json({ success: false, error: "Internal server error" });
   }
-}
+};
 
 // Delete ProviderForm
-// DELETE /api/providers/:providerId/forms/:id
+ 
 export const deleteProviderForm = async (req, res) => {
   try {
-    const { providerId, id } = req.params;
-    const form = await prisma.providerForm.findUnique({ where: { id } });
-    if (!form || form.providerId !== providerId)
+    // Accept id from params — ignore providerId if present
+    const providerId = req.params.providerId;
+    if (!providerId) {
+      return res
+        .status(400)
+        .json({ success: false, error: "Form id is required" });
+    }
+
+    // Find the form by its id
+    const form = await prisma.providerForm.findUnique({
+      where: { providerId },
+    });
+
+    if (!form) {
       return res.status(404).json({
         success: false,
-        error: "ProviderForm not found for this provider",
+        error: "ProviderForm not found",
       });
+    }
 
-    await prisma.providerForm.delete({ where: { id } });
+    // Delete the form
+    await prisma.providerForm.delete({ where: { providerId } });
+
     return res.status(204).send();
   } catch (err) {
     console.error("deleteProviderForm error:", err);

@@ -16,8 +16,8 @@ const router = express.Router();
 
 router.post("/", protectAdmin, createLoanProvider);
 router.get("/", protectUser, getLoanProviders);
-router.get("/:id", protectUser, getLoanProviderById);
-router.patch("/:id", protectAdmin, updateLoanProvider);
-router.delete("/:id", protectAdmin, deleteLoanProvider);
+router.get("/:providerId", protectUser, getLoanProviderById);
+router.patch("/:providerId", protectAdmin, updateLoanProvider);
+router.delete("/:providerId", protectAdmin, deleteLoanProvider);
 
 export default router;

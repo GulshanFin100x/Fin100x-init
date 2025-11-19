@@ -1,6 +1,6 @@
 import prisma from "../lib/prisma.js";
 
-const Joi = require("joi");
+import Joi from "joi";
 
 // ---------- Validation Schemas ----------
 const createSchema = Joi.object({
@@ -38,10 +38,40 @@ const createSchema = Joi.object({
   metadata: Joi.any().optional(),
 });
 
-const updateSchema = createSchema.fork(
-  ["name", "code", "apiBaseUrl", "authType"],
-  (s) => s.optional()
-);
+const updateSchema = Joi.object({
+  name: Joi.string().max(100).optional(),
+  displayName: Joi.string().max(150).allow("", null).optional(),
+  code: Joi.string().max(50).optional(),
+  category: Joi.string().optional(),
+  logoUrl: Joi.string().uri().allow("", null).optional(),
+  description: Joi.string().allow("", null).optional(),
+  apiBaseUrl: Joi.string().uri().optional(),
+  apiVersion: Joi.string().allow("", null).optional(),
+  authType: Joi.string()
+    .valid("OAUTH2", "API_KEY", "BEARER_TOKEN", "BASIC_AUTH", "CUSTOM")
+    .optional(),
+  authConfig: Joi.any().optional(),
+  maxLoanAmount: Joi.number().positive().optional().allow(null),
+  minLoanAmount: Joi.number().positive().optional().allow(null),
+  minCreditScore: Joi.number().integer().min(0).optional().allow(null),
+  supportedTenures: Joi.array()
+    .items(Joi.number().integer().positive())
+    .optional(),
+  interestRateRange: Joi.string().optional().allow(null),
+  processingFee: Joi.number().precision(2).optional().allow(null),
+  isActive: Joi.boolean().optional(),
+  supportsInstantApproval: Joi.boolean().optional(),
+  supportsEmi: Joi.boolean().optional(),
+  supportsTopup: Joi.boolean().optional(),
+  requiresKyc: Joi.boolean().optional(),
+  rateLimit: Joi.number().integer().optional(),
+  timeout: Joi.number().integer().optional(),
+  webhookUrl: Joi.string().uri().optional().allow(null),
+  webhookSecret: Joi.string().optional().allow(null),
+  webhookEvents: Joi.array().items(Joi.string()).optional(),
+  priority: Joi.number().integer().optional(),
+  metadata: Joi.any().optional(),
+});
 
 // ---------- Controllers ----------
 
@@ -121,8 +151,10 @@ export const getLoanProviders = async (req, res) => {
 // Get single provider by id
 export const getLoanProviderById = async (req, res) => {
   try {
-    const { id } = req.params;
-    const provider = await prisma.loanProvider.findUnique({ where: { id } });
+    const { providerId : id } = req.params;
+    const provider = await prisma.loanProvider.findUnique({
+      where: { id },
+    });
     if (!provider)
       return res
         .status(404)
@@ -139,7 +171,7 @@ export const getLoanProviderById = async (req, res) => {
 // Update provider (partial)
 export const updateLoanProvider = async(req, res) => {
   try {
-    const { id } = req.params;
+    const { providerId : id } = req.params;
     const { error, value } = updateSchema.validate(req.body, {
       stripUnknown: true,
     });
@@ -149,7 +181,9 @@ export const updateLoanProvider = async(req, res) => {
         .json({ success: false, error: error.details.map((d) => d.message) });
 
     // Ensure provider exists
-    const exists = await prisma.loanProvider.findUnique({ where: { id } });
+    const exists = await prisma.loanProvider.findUnique({
+      where: { id },
+    });
     if (!exists)
       return res
         .status(404)
@@ -180,7 +214,7 @@ export const updateLoanProvider = async(req, res) => {
 // Delete provider
 export const deleteLoanProvider = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { providerId : id } = req.params;
 
     // Option A: Soft-delete (recommended) - set isActive = false or add deletedAt
     // For this schema we will hard delete. If you want soft delete, replace with update.

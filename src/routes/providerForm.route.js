@@ -14,10 +14,14 @@ import {
 
 const router = express.Router();
 
-router.post("/", protectAdmin, createProviderForm);
+router.post("/:providerId", protectAdmin, createProviderForm);
+router.get("/:providerId", protectUser, listProviderForms);
 router.get("/", protectAdmin, listProviderForms);
-router.get("/:id", protectUser, getProviderFormById);
-router.patch("/:id", protectAdmin, updateProviderForm);
-router.delete("/:id", protectAdmin, deleteProviderForm);
+
+//no need of below as such so commented it out -- by gulshan
+// router.get("/:providerId", protectAdmin, getProviderFormById);
+
+router.patch("/:providerId", protectAdmin, updateProviderForm);
+router.delete("/:providerId", protectAdmin, deleteProviderForm);
 
 export default router;
